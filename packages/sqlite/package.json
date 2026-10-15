@@ -1,0 +1,65 @@
+{
+  "name": "@cutils/sqlite",
+  "version": "0.1.0",
+  "description": "Embedded SQLite for chttp/scriptc apps — vendored amalgamation, FFI shim, Standard-Schema row seam. Compiles to a single static ELF.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sigilco/cutils.git",
+    "directory": "packages/sqlite"
+  },
+  "files": [
+    "dist",
+    "src",
+    "vendor",
+    "build/libsqlite3-shim.a"
+  ],
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -c vendor/shim/sqlite_shim.c -o build/sqlite_shim.o",
+    "build:sqlite": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -c vendor/sqlite-amalgamation/sqlite3.c -o build/sqlite3.o",
+    "build:archive": "ar rcs build/libsqlite3-shim.a build/sqlite_shim.o build/sqlite3.o",
+    "build:lib": "ranlib build/libsqlite3-shim.a",
+    "build:shared": "cc -O2 -fPIC -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -Wl,-Bsymbolic -shared vendor/shim/sqlite_shim.c vendor/sqlite-amalgamation/sqlite3.c -o build/libcutils_sqlite.so",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "pnpm build:c && pnpm build:sqlite && pnpm build:archive && pnpm build:lib && pnpm build:ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && pnpm build:shared && pnpm test:c && pnpm test:node",
+    "test:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA test/shim.test.c build/libsqlite3-shim.a -o build/shim_test -lm && ./build/shim_test",
+    "test:node": "node --test test/*.test.js test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@chttp/val": "^0.2.1",
+    "@standard-schema/spec": "^1.1.0",
+    "@types/node": "^24.0.0",
+    "koffi": "^2.14.1",
+    "typescript": "^5.9.0",
+    "valibot": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "Joaquin Terrasa & contributors",
+  "keywords": [
+    "sqlite",
+    "database",
+    "standard-schema",
+    "scriptc",
+    "native",
+    "elf"
+  ],
+  "homepage": "https://github.com/sigilco/cutils/tree/main/packages/sqlite#readme",
+  "bugs": {
+    "url": "https://github.com/sigilco/cutils/issues"
+  },
+  "sideEffects": false
+}

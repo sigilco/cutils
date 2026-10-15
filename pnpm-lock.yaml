@@ -182,11 +182,18 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
-  packages/cache:
-    devDependencies:
+  examples/todo-app:
+    dependencies:
       '@chttp/router':
         specifier: ^0.2.1
         version: 0.2.1
+      '@chttp/val':
+        specifier: ^0.2.1
+        version: 0.2.1
+      '@cutils/sqlite':
+        specifier: workspace:^
+        version: link:../../packages/sqlite
+    devDependencies:
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
@@ -194,11 +201,8 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
-  packages/mcp:
+  packages/sqlite:
     devDependencies:
-      '@chttp/router':
-        specifier: ^0.2.1
-        version: 0.2.1
       '@chttp/val':
         specifier: ^0.2.1
         version: 0.2.1
@@ -208,14 +212,14 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
-      '@valibot/to-json-schema':
-        specifier: ^1.8.0
-        version: 1.8.0(valibot@1.5.0(typescript@5.9.3))
+      koffi:
+        specifier: ^2.14.1
+        version: 2.16.3
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
       valibot:
-        specifier: ^1.5.0
+        specifier: ^1.1.0
         version: 1.5.0(typescript@5.9.3)
 
 packages:
@@ -706,11 +710,6 @@ packages:
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
-  '@valibot/to-json-schema@1.8.0':
-    resolution: {integrity: sha512-a0M+uwCuQZEPAo65NYkFSJ14O5c213KoSZmPdoCfuFvUhfULi4T2Z6Tpjv6lTVMW9RoLm74RpRAjNEa43KcN+g==}
-    peerDependencies:
-      valibot: ^1.5.0
-
   aiplug@0.1.2:
     resolution: {integrity: sha512-NYYRuCewtIACs2Vbxw8l0EOBZMsyV/uWGq5zh+3f9rj1DBMheycCj031eudZmRJIwPUgsx/LzXY4/JkyP7owhQ==}
     engines: {node: '>=18.17.0'}
@@ -770,6 +769,9 @@ packages:
   katex@0.18.10:
     resolution: {integrity: sha512-/B6p9eY9DX7aHBfpkHdpirDTZ5QH9xTwL9y837PWuzuv41O5jFdqNQwVQEQsimY0/iVNkwBY4+4hMfhQ7d4Dbw==}
     hasBin: true
+
+  koffi@2.16.3:
+    resolution: {integrity: sha512-E9y1AsgYGlaxMhcZzHr8y96QF2U5XzA12GGVAfbWqIubTwPNMXQarfBzePNXHe0xtIEtNd6ifAv3GAKYGUeBAQ==}
 
   linkify-it@5.0.2:
     resolution: {integrity: sha512-ONTm2jCMAVZjgQa/Fy1kScXsuOoF5NPTsoFBdE1KVIZ2vAh/r9+Bqo+0jINCBYnavTPQZz38QzFTme79ENoN3Q==}
@@ -1220,10 +1222,6 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
-  '@valibot/to-json-schema@1.8.0(valibot@1.5.0(typescript@5.9.3))':
-    dependencies:
-      valibot: 1.5.0(typescript@5.9.3)
-
   aiplug@0.1.2:
     dependencies:
       yaml: 2.9.1
@@ -1298,6 +1296,8 @@ snapshots:
   katex@0.18.10:
     dependencies:
       commander: 15.0.0
+
+  koffi@2.16.3: {}
 
   linkify-it@5.0.2:
     dependencies:
