@@ -41,6 +41,10 @@
         {
           "title": "@chttp/cache",
           "path": "/cache"
+        },
+        {
+          "title": "@chttp/mcp",
+          "path": "/mcp"
         }
       ]
     }
