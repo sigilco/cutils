@@ -16,7 +16,13 @@ if [ ! -f build/libsqlite3-shim.a ]; then
   fail "build/libsqlite3-shim.a missing — run pnpm build first"
 fi
 
-pnpm exec scriptc build gate.ts --ffi gate.ffi.json -o build/gate-elf \
+# Prefer the workspace-root binary; `pnpm exec` resolves to a stray PATH
+# pnpm on some machines.
+BIN="scriptc"
+if [ -x ../../node_modules/.bin/scriptc ]; then
+  BIN="../../node_modules/.bin/scriptc"
+fi
+"$BIN" build gate.ts --ffi gate.ffi.json -o build/gate-elf \
   || fail "scriptc build"
 
 out=$(./build/gate-elf) || fail "gate-elf exited nonzero"

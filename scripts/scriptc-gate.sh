@@ -14,6 +14,13 @@ if [ "${#GATES[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# Prefer the workspace-root binary; `pnpm exec` resolves to a stray PATH
+# pnpm on some machines.
+BIN="scriptc"
+if [ -x node_modules/.bin/scriptc ]; then
+  BIN="node_modules/.bin/scriptc"
+fi
+
 fail=0
 for gate in "${GATES[@]}"; do
   # Per-gate FFI manifest: a gate.ffi.json sibling of gate.ts is passed as
@@ -23,7 +30,7 @@ for gate in "${GATES[@]}"; do
   if [ -f "$ffi_manifest" ]; then
     ffi_args=( --ffi "$ffi_manifest" )
   fi
-  out=$(pnpm exec scriptc coverage "$gate" "${ffi_args[@]}" 2>&1) || true
+  out=$("$BIN" coverage "$gate" "${ffi_args[@]}" 2>&1) || true
   line=$(printf '%s\n' "$out" | grep -E 'compile statically' || true)
   if [[ "$line" == *"(100%)"* ]]; then
     printf 'ok   %s %s\n' "$gate" "$(printf '%s' "$line" | tr -s ' ')"
