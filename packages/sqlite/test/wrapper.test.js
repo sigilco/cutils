@@ -118,18 +118,26 @@ test("run validates and binds the transformed output", () => {
 
 test("transactions: commit, nested auto-savepoint, rollback", () => {
   const db = fresh();
-  {
-    using tx = db.transaction();
+  const tx = db.transaction();
+  try {
     db.exec("INSERT INTO todos (title) VALUES ('a')");
-    {
-      using nested = db.transaction();
+    const nested = db.transaction();
+    try {
       db.exec("INSERT INTO todos (title) VALUES ('b')");
       nested.rollback();
+    } finally {
+      nested[Symbol.dispose]();
     }
-    using sp = tx.savepoint("sp1");
-    db.exec("INSERT INTO todos (title) VALUES ('c')");
-    sp.rollback();
+    const sp = tx.savepoint("sp1");
+    try {
+      db.exec("INSERT INTO todos (title) VALUES ('c')");
+      sp.rollback();
+    } finally {
+      sp[Symbol.dispose]();
+    }
     tx.commit();
+  } finally {
+    tx[Symbol.dispose]();
   }
   const n = db.prepareRaw("SELECT COUNT(*) AS n FROM todos").getOrNull([]);
   assert.equal(n.n, 1);
@@ -137,9 +145,13 @@ test("transactions: commit, nested auto-savepoint, rollback", () => {
 
   // Error inside a tx marks it failed; dispose rolls back.
   assert.throws(() => {
-    using tx2 = db.transaction();
-    db.exec("INSERT INTO todos (title) VALUES (NULL)");
-    tx2.commit();
+    const tx2 = db.transaction();
+    try {
+      db.exec("INSERT INTO todos (title) VALUES (NULL)");
+      tx2.commit();
+    } finally {
+      tx2[Symbol.dispose]();
+    }
   }, SqliteError);
   assert.equal(db.inTransaction, false);
   db.close();
@@ -162,12 +174,11 @@ test("blob round-trip + bigint handling", () => {
 
 test("empty string and empty blob bind as empty, not NULL", () => {
   const db = fresh();
-  db.prepareRaw("INSERT INTO todos (title, payload) VALUES (?, ?)").run([
-    "",
-    new Uint8Array(0),
-  ]);
+  db.prepareRaw("INSERT INTO todos (title, payload) VALUES (?, ?)").run(["", new Uint8Array(0)]);
   const r = db
-    .prepareRaw("SELECT title, payload, title IS NULL AS tnull, payload IS NULL AS pnull FROM todos WHERE id = 1")
+    .prepareRaw(
+      "SELECT title, payload, title IS NULL AS tnull, payload IS NULL AS pnull FROM todos WHERE id = 1",
+    )
     .getOrNull([]);
   assert.equal(r.title, "");
   assert.equal(r.tnull, 0);
@@ -219,25 +230,31 @@ test("errors: SqliteError codes propagate", () => {
   );
 });
 
-test("using dispose + readonly open", () => {
-  {
-    using db = Database.openInMemory();
-    assert.equal(db.memory, true);
-    assert.equal(db.readonly, false);
+test("Symbol.dispose + readonly open", () => {
+  const mem = Database.openInMemory();
+  try {
+    assert.equal(mem.memory, true);
+    assert.equal(mem.readonly, false);
+  } finally {
+    mem[Symbol.dispose]();
   }
   const tmp = `${import.meta.dirname}/tmp-ro.db`;
-  {
-    using db = Database.open(tmp);
-    db.exec("CREATE TABLE t (a INTEGER)");
+  const w = Database.open(tmp);
+  try {
+    w.exec("CREATE TABLE t (a INTEGER)");
+  } finally {
+    w[Symbol.dispose]();
   }
-  {
-    using ro = Database.open(tmp, { readonly: true });
+  const ro = Database.open(tmp, { readonly: true });
+  try {
     assert.equal(ro.readonly, true);
     assert.equal(ro.memory, false);
     assert.throws(
       () => ro.exec("INSERT INTO t VALUES (1)"),
       (e) => e.code === "SQLITE_READONLY",
     );
+  } finally {
+    ro[Symbol.dispose]();
   }
   unlinkSync(tmp);
 });
