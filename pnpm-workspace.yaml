@@ -9,6 +9,7 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - scriptc
   - '@scriptc/*'
+  - "@chttp/router@0.2.1"
 versioning:
   fixed:
     - ["@cutils/sqlite", "@chttp/cache", "@chttp/mcp"]
