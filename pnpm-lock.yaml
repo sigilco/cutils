@@ -201,6 +201,30 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  packages/auth:
+    devDependencies:
+      '@chttp/router':
+        specifier: ^0.2.1
+        version: 0.2.1
+      '@chttp/val':
+        specifier: ^0.2.1
+        version: 0.2.1
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      jose:
+        specifier: ^6.0.0
+        version: 6.2.12
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      valibot:
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@5.9.3)
+
   packages/cache:
     devDependencies:
       '@chttp/router':
@@ -807,6 +831,9 @@ packages:
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
 
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
+
   katex@0.18.10:
     resolution: {integrity: sha512-/B6p9eY9DX7aHBfpkHdpirDTZ5QH9xTwL9y837PWuzuv41O5jFdqNQwVQEQsimY0/iVNkwBY4+4hMfhQ7d4Dbw==}
     hasBin: true
@@ -1337,6 +1364,8 @@ snapshots:
   has-flag@4.0.0: {}
 
   ieee754@1.2.1: {}
+
+  jose@6.2.12: {}
 
   katex@0.18.10:
     dependencies:
