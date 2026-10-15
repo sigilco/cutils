@@ -112,11 +112,27 @@ no perf claims until the bench cell lands):
 ## Node usage
 
 The npm package ships `dist/esm`. Under Node the emitted `shim_*` calls resolve
-on `globalThis` — `test/koffi-binding.mjs` shows loading
-`build/libcutils_sqlite.so` through [koffi](https://koffi.dev) (built by
-`pnpm build:shared`; the `.so` is linked `-Wl,-Bsymbolic` so the vendored
-amalgamation's `sqlite3_*` symbols can't interpose against a host's sqlite —
-this is load-bearing, Node ≥ 22 exports its own sqlite3 symbols).
+on `globalThis` — an official [koffi](https://koffi.dev) binding loads
+`build/libcutils_sqlite.so` for you:
+
+```sh
+# one-time, inside the installed package (needs a C toolchain):
+npm run build:shared --prefix node_modules/@cutils/sqlite
+```
+
+```ts
+import "koffi"; // ensure the optional peer is installed
+import "@cutils/sqlite/node-binding"; // installs the shim_* globals
+import { Database } from "@cutils/sqlite";
+```
+
+`koffi` is an **optional peer dependency** — install it when you run under
+Node; scriptc builds never see it. The `.so` is linked `-Wl,-Bsymbolic` so the
+vendored amalgamation's `sqlite3_*` symbols can't interpose against a host's
+sqlite — this is load-bearing, Node ≥ 22 exports its own sqlite3 symbols.
+
+Node ≥ 22 is the runtime floor; the test suite also runs there (no
+`using`-syntax — dispose paths are exercised via `[Symbol.dispose]()`).
 
 ## Subset quirks
 

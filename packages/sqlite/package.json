@@ -22,7 +22,8 @@
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./node-binding": "./dist/esm/node-binding.mjs"
   },
   "scripts": {
     "build:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -c vendor/shim/sqlite_shim.c -o build/sqlite_shim.o",
@@ -31,7 +32,7 @@
     "build:lib": "ranlib build/libsqlite3-shim.a",
     "build:shared": "cc -O2 -fPIC -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -Wl,-Bsymbolic -shared vendor/shim/sqlite_shim.c vendor/sqlite-amalgamation/sqlite3.c -o build/libcutils_sqlite.so",
     "build:ts": "tsc -p tsconfig.json",
-    "build": "mkdir -p build && npm run build:c && npm run build:sqlite && npm run build:archive && npm run build:lib && npm run build:ts",
+    "build": "mkdir -p build && npm run build:c && npm run build:sqlite && npm run build:archive && npm run build:lib && npm run build:ts && sed 's|\"\\.\\.\", \"build\"|\"..\", \"..\", \"build\"|' test/koffi-binding.mjs > dist/esm/node-binding.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && npm run build:shared && npm run test:c && npm run test:node && bash test/elf.test.sh",
     "test:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA test/shim.test.c build/libsqlite3-shim.a -o build/shim_test -lm && ./build/shim_test",
@@ -47,6 +48,14 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "peerDependencies": {
+    "koffi": "^2.14.1"
+  },
+  "peerDependenciesMeta": {
+    "koffi": {
+      "optional": true
+    }
   },
   "author": "Joaquin Terrasa & contributors",
   "keywords": [
