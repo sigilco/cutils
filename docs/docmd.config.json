@@ -1,0 +1,44 @@
+{
+  "title": "cutils Documentation",
+  "url": "https://cutils.pages.dev/",
+  "src": ".",
+  "out": "site",
+  "theme": {
+    "primary": "#2f6f4f"
+  },
+  "plugins": {
+    "ai": false
+  },
+  "navigation": [
+    {
+      "title": "Concepts",
+      "collapsible": true,
+      "children": [
+        {
+          "title": "What is cutils",
+          "path": "/"
+        }
+      ]
+    },
+    {
+      "title": "Getting Started",
+      "collapsible": true,
+      "children": [
+        {
+          "title": "Quickstart",
+          "path": "/quickstart"
+        }
+      ]
+    },
+    {
+      "title": "Packages",
+      "collapsible": true,
+      "children": [
+        {
+          "title": "Overview",
+          "path": "/packages"
+        }
+      ]
+    }
+  ]
+}

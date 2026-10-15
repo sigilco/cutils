@@ -1,0 +1,16 @@
+packages:
+  - packages/*
+  - examples/*
+  - bench/*
+allowBuilds:
+  esbuild: true
+  '@docmd/engine-rust': true
+  scriptc: true
+minimumReleaseAgeExclude:
+  - scriptc
+  - '@scriptc/*'
+versioning:
+  fixed:
+    - ["@cutils/sqlite", "@chttp/cache", "@chttp/mcp"]
+  changelog:
+    storage: repository
