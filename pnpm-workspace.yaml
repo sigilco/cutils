@@ -16,6 +16,6 @@ versioning:
   ignore:
     - "@cutils-example/todo-app"
   fixed:
-    - ["@cutils/sqlite", "@chttp/cache", "@chttp/mcp"]
+    - ["@cutils/sqlite", "@cutils/postgres", "@cutils/mongo", "@chttp/cache", "@chttp/mcp", "@chttp/auth"]
   changelog:
     storage: repository
