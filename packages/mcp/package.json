@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsc -p tsconfig.json && node --test test/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test test/*.test.js && bash test/elf.test.sh"
   },
   "devDependencies": {
     "@chttp/router": "^0.2.1",

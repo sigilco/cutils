@@ -33,7 +33,7 @@
     "build:ts": "tsc -p tsconfig.json",
     "build": "mkdir -p build && npm run build:c && npm run build:sqlite && npm run build:archive && npm run build:lib && npm run build:ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && npm run build:shared && npm run test:c && npm run test:node",
+    "test": "npm run build && npm run build:shared && npm run test:c && npm run test:node && bash test/elf.test.sh",
     "test:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA test/shim.test.c build/libsqlite3-shim.a -o build/shim_test -lm && ./build/shim_test",
     "test:node": "node --test test/*.test.js test/*.test.mjs"
   },

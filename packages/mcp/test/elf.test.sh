@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds test/elf-smoke.ts to a native ELF with `scriptc build`, runs it, and
 # asserts the JSON-RPC roundtrip + SSE frame shape. Requires `pnpm install`
-# to have run. Not part of `pnpm test` — wire into a CI matrix entry.
+# to have run. Runs as part of `pnpm test`.
 set -euo pipefail
 
 PKG="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -14,7 +14,13 @@ fail() {
 }
 
 cd "$ROOT"
-pnpm exec scriptc build "$PKG/test/elf-smoke.ts" -o "$OUT" >/dev/null \
+# Prefer the workspace-root binary; `pnpm exec` resolves to a stray PATH
+# pnpm on some machines.
+BIN="scriptc"
+if [ -x node_modules/.bin/scriptc ]; then
+  BIN="node_modules/.bin/scriptc"
+fi
+"$BIN" build "$PKG/test/elf-smoke.ts" -o "$OUT" >/dev/null \
   || fail "scriptc build"
 echo "build OK"
 
