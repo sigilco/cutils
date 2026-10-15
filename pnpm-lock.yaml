@@ -182,6 +182,25 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  examples/todo-app:
+    dependencies:
+      '@chttp/router':
+        specifier: ^0.2.1
+        version: 0.2.1
+      '@chttp/val':
+        specifier: ^0.2.1
+        version: 0.2.1
+      '@cutils/sqlite':
+        specifier: workspace:^
+        version: link:../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   packages/cache:
     devDependencies:
       '@chttp/router':
@@ -216,6 +235,27 @@ importers:
         version: 5.9.3
       valibot:
         specifier: ^1.5.0
+        version: 1.5.0(typescript@5.9.3)
+
+  packages/sqlite:
+    devDependencies:
+      '@chttp/val':
+        specifier: ^0.2.1
+        version: 0.2.1
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      koffi:
+        specifier: ^2.14.1
+        version: 2.16.3
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      valibot:
+        specifier: ^1.1.0
         version: 1.5.0(typescript@5.9.3)
 
 packages:
@@ -771,6 +811,9 @@ packages:
     resolution: {integrity: sha512-/B6p9eY9DX7aHBfpkHdpirDTZ5QH9xTwL9y837PWuzuv41O5jFdqNQwVQEQsimY0/iVNkwBY4+4hMfhQ7d4Dbw==}
     hasBin: true
 
+  koffi@2.16.3:
+    resolution: {integrity: sha512-E9y1AsgYGlaxMhcZzHr8y96QF2U5XzA12GGVAfbWqIubTwPNMXQarfBzePNXHe0xtIEtNd6ifAv3GAKYGUeBAQ==}
+
   linkify-it@5.0.2:
     resolution: {integrity: sha512-ONTm2jCMAVZjgQa/Fy1kScXsuOoF5NPTsoFBdE1KVIZ2vAh/r9+Bqo+0jINCBYnavTPQZz38QzFTme79ENoN3Q==}
 
@@ -1298,6 +1341,8 @@ snapshots:
   katex@0.18.10:
     dependencies:
       commander: 15.0.0
+
+  koffi@2.16.3: {}
 
   linkify-it@5.0.2:
     dependencies:
