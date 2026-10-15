@@ -23,6 +23,43 @@ import {
 - **OAuth2 + PKCE** — `generateState`, `generateCodeVerifier`, `codeChallenge`, `createAuthorizationURL`, `exchangeCodeForTokens` (form POST + basic auth; JSON and form-urlencoded responses both parse), `fetchUserInfo`/`fetchUserInfoWith`. `googleProvider`, `githubProvider`, `discordProvider` presets; a new provider is a 15-LoC record in user code.
 - **TOTP** — `generateTotpSecret` (base32, RFC 4648), `totpAuthUri` (otpauth:// enrollment URI), `verifyTotp` (HMAC-SHA1, 6 digits, 30 s step, ±1 window, constant-time).
 
+## Recipe: API keys
+
+No dedicated module is needed — an API key is a session token whose record carries scopes and a far-future expiry. Only the SHA-256 hash is ever stored, so a database leak doesn't leak usable keys.
+
+```ts
+import {
+  createSession,
+  generateSessionToken,
+  hashToken,
+  invalidateSession,
+  validateSessionToken,
+} from "@chttp/auth";
+
+// Provisioning: show `apiKey` to the caller exactly once.
+const TEN_YEARS = 10 * 365 * 24 * 60 * 60;
+const apiKey = generateSessionToken(); // id.secret bearer token (~64 chars)
+await createSession(store, apiKey, ownerUserId, { scopes: ["read", "deploy"] }, {
+  ttlSeconds: TEN_YEARS,
+});
+
+// Per request: "Authorization: Bearer <apiKey>". extensionThresholdSeconds: 0
+// keeps the record's expiry fixed — API keys shouldn't slide on every call.
+const key = bearer(c.req.header("authorization"));
+const rec =
+  key === null
+    ? null
+    : await validateSessionToken(store, key, { extensionThresholdSeconds: 0 });
+if (rec === null) return c.status(401).text("unauthorized");
+const scopes = rec.attributes.scopes as string[];
+if (scopes.indexOf("deploy") < 0) return c.status(403).text("forbidden");
+
+// Revocation is the same as sessions:
+await invalidateSession(store, leakedKey);
+```
+
+Use `store.get(hashToken(key))` directly instead of `validateSessionToken` when you want to skip the expiry check entirely and manage revocation/rotation yourself; stamp `lastUsedAt` into `rec.attributes` on a throttle if you need audit fields.
+
 ## Status
 
 v0.1.0. ES256 is recognized but unlowerable under scriptc 0.3.3 (no asymmetric `node:crypto` lowering): `signJwt` throws `E_BAD_ALG`, `verifyJwt` returns null, and the `string | KeyObject` signature is kept for the upstream drop. JWE, JWKS, EdDSA, WebAuthn and Argon2 are out of scope by design — see the package AGENTS.md and the plan in `.agents/plans/`.
