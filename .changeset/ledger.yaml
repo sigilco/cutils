@@ -1,0 +1,12 @@
+"@chttp/cache@0.1.0":
+  dir: packages/cache
+  intents:
+    - wicked-lizards-wash
+"@chttp/mcp@0.1.0":
+  dir: packages/mcp
+  intents:
+    - cool-cups-rule
+"@cutils/sqlite@0.1.0":
+  dir: packages/sqlite
+  intents:
+    - loud-emus-own
