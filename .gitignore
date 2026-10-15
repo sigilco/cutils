@@ -1,0 +1,12 @@
+.scriptc/
+node_modules/
+dist/
+build/
+
+.env
+docs/site/
+examples/*/node_modules/
+examples/*/dist/
+examples/*/app
+examples/*/.vendor/
+.agents/notes/*-handoff*.md
