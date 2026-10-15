@@ -15,6 +15,7 @@ minimumReleaseAgeExclude:
 versioning:
   ignore:
     - "@cutils-example/todo-app"
+    - "@cutils-example/todo-app-postgres"
   fixed:
     - ["@cutils/sqlite", "@cutils/postgres", "@cutils/mongo", "@chttp/cache", "@chttp/mcp", "@chttp/auth"]
   changelog:
