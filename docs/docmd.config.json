@@ -39,6 +39,10 @@
           "path": "/packages"
         },
         {
+          "title": "@cutils/sqlite",
+          "path": "/sqlite"
+        },
+        {
           "title": "@chttp/cache",
           "path": "/cache"
         },
