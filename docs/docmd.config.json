@@ -37,6 +37,10 @@
         {
           "title": "Overview",
           "path": "/packages"
+        },
+        {
+          "title": "@chttp/cache",
+          "path": "/cache"
         }
       ]
     }
