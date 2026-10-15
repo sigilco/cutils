@@ -168,6 +168,16 @@ function main(): void {
   const cntRow = cnt.getOrNull([]) as Row;
   check(cntRow.n === 5, "rows after tx commit");
 
+  // Empty-string bind must round-trip as '' — an empty span can reach the
+  // shim as a NULL pointer and sqlite3_bind_text(NULL, n) binds SQL NULL.
+  const emp = db.prepareRaw("INSERT INTO todos (title, done) VALUES (?, ?)");
+  emp.runRaw(["", 0]);
+  const empHit = db
+    .prepareRaw("SELECT id FROM todos WHERE title = '' AND id = ?")
+    .getOrNull([db.lastInsertRowid()]);
+  check(empHit !== null, "empty-string bind stays ''");
+  emp.finalize();
+
   let txErrCode = "";
   try {
     using tx2 = db.transaction();

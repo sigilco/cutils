@@ -160,6 +160,22 @@ test("blob round-trip + bigint handling", () => {
   db.close();
 });
 
+test("empty string and empty blob bind as empty, not NULL", () => {
+  const db = fresh();
+  db.prepareRaw("INSERT INTO todos (title, payload) VALUES (?, ?)").run([
+    "",
+    new Uint8Array(0),
+  ]);
+  const r = db
+    .prepareRaw("SELECT title, payload, title IS NULL AS tnull, payload IS NULL AS pnull FROM todos WHERE id = 1")
+    .getOrNull([]);
+  assert.equal(r.title, "");
+  assert.equal(r.tnull, 0);
+  assert.equal(r.payload.length, 0);
+  assert.equal(r.pnull, 0);
+  db.close();
+});
+
 test("pragma, columns, expanded sql, bind", () => {
   const db = fresh();
   const pv = db.pragma("user_version");

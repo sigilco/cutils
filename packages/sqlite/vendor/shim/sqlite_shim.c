@@ -235,9 +235,14 @@ int32_t shim_bind_dbl(void *stmt, int32_t idx, double val) {
 }
 
 /* The text span is length-delimited; SQLITE_TRANSIENT copies the bytes
- * inside the call — required because the borrow is call-scoped. */
+ * inside the call — required because the borrow is call-scoped.
+ * An EMPTY span may arrive as a NULL pointer (koffi marshals an empty
+ * Uint8Array as NULL; the ELF span for "" can also carry address 0) and
+ * sqlite3_bind_text(NULL, n) binds SQL NULL — substitute a non-NULL
+ * literal so '' stays ''. */
 int32_t shim_bind_text(void *stmt, int32_t idx, const uint8_t *val,
                        size_t vlen) {
+  if (val == NULL) val = (const uint8_t *)"";
   return (int32_t)sqlite3_bind_text((sqlite3_stmt *)stmt, (int)idx,
                                     (const char *)val, (int)vlen,
                                     SQLITE_TRANSIENT);
@@ -245,6 +250,8 @@ int32_t shim_bind_text(void *stmt, int32_t idx, const uint8_t *val,
 
 int32_t shim_bind_blob(void *stmt, int32_t idx, const uint8_t *val,
                        size_t vlen) {
+  /* Same empty-span NULL trap as shim_bind_text. */
+  if (val == NULL) val = (const uint8_t *)"";
   return (int32_t)sqlite3_bind_blob((sqlite3_stmt *)stmt, (int)idx, val,
                                     (int)vlen, SQLITE_TRANSIENT);
 }
