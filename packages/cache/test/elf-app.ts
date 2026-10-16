@@ -1,4 +1,4 @@
-// ELF smoke app for @chttp/cache — compiled with `scriptc build` by
+// ELF smoke app for @cutils/cache — compiled with `scriptc build` by
 // test/elf.test.sh. Fills past max, asserts eviction order and TTL
 // expiry inside the native binary, prints OK.
 

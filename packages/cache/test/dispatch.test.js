@@ -1,4 +1,4 @@
-// Cross-request persistence test: @chttp/cache inside a real @chttp/router
+// Cross-request persistence test: @cutils/cache inside a real @chttp/router
 // handler chain over a live HTTP server. The cache is process memory — a
 // value set in one request must be visible to the next.
 import { test, after } from "node:test";

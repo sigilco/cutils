@@ -1,4 +1,4 @@
-# @chttp/cache
+# @cutils/cache
 
 LRU + TTL in-process memory cache with [lru-cache](https://github.com/isaacs/node-lru-cache)-parity semantics, authored in the scriptc-compilable subset — the same source runs under Node and lowers into a native ELF.
 
@@ -9,11 +9,11 @@ LRU + TTL in-process memory cache with [lru-cache](https://github.com/isaacs/nod
 == tab Node
 
 ```sh
-pnpm add @chttp/cache
+pnpm add @cutils/cache
 ```
 
 ```ts
-import { Cache } from "@chttp/cache";
+import { Cache } from "@cutils/cache";
 
 const sessions: Cache<string> = new Cache({ max: 10_000, ttl: 60_000 });
 
@@ -25,7 +25,7 @@ sessions.get("missing"); // null — misses are never undefined
 == tab Native ELF
 
 ```ts
-import { Cache } from "@chttp/cache";
+import { Cache } from "@cutils/cache";
 
 const seen: Cache<number> = new Cache({ max: 1_000 });
 seen.set("job-7", 1);
@@ -47,7 +47,7 @@ scriptc build src/main.ts -o app
 
 ## Divergences from lru-cache
 
-| lru-cache | @chttp/cache |
+| lru-cache | @cutils/cache |
 | --- | --- |
 | `V \| undefined` misses | `V \| null`; `has()` disambiguates |
 | `LRUCache<K, V>` typed keys + values | `Cache<V>` phantom alias; keys are `string`, values narrow at the call site |

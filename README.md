@@ -12,7 +12,7 @@
 | [`@cutils/sqlite`](packages/sqlite) | Embedded SQLite: `Database`/`Stmt`/`Transaction` with a Standard-Schema row seam, vendored amalgamation + C shim, compiles into the ELF |
 | [`@cutils/postgres`](packages/postgres) | Postgres wire driver over `node:net` + `node:crypto` (SCRAM-SHA-256, txns, LISTEN/NOTIFY), no FFI |
 | [`@cutils/mongo`](packages/mongo) | MongoDB wire driver (OP_MSG + BSON, SCRAM-SHA-1/256, txns), no FFI |
-| [`@chttp/cache`](packages/cache) | LRU + TTL in-process cache with lru-cache parity semantics |
+| [`@cutils/cache`](packages/cache) | LRU + TTL in-process cache with lru-cache parity semantics |
 
 ## What it does
 

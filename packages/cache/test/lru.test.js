@@ -1,4 +1,4 @@
-// LRU eviction tests for @chttp/cache — runs on the tsc build (node --test).
+// LRU eviction tests for @cutils/cache — runs on the tsc build (node --test).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Cache } from "../dist/esm/index.js";

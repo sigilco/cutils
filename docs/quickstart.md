@@ -4,7 +4,7 @@ Each package installs from npm and works the same under Node and under `scriptc 
 
 ```sh
 pnpm add @cutils/sqlite   # embedded SQLite
-pnpm add @chttp/cache     # LRU + TTL memory cache
+pnpm add @cutils/cache     # LRU + TTL memory cache
 ```
 
 ::: tabs

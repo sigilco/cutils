@@ -51,7 +51,7 @@
           "path": "/mongo"
         },
         {
-          "title": "@chttp/cache",
+          "title": "@cutils/cache",
           "path": "/cache"
         }
       ]

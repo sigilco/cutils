@@ -1,4 +1,4 @@
-// TTL tests for @chttp/cache — runs on the tsc build (node --test).
+// TTL tests for @cutils/cache — runs on the tsc build (node --test).
 // The constructor-only `now` seam injects a fake clock so expiry is
 // deterministic.
 import { test } from "node:test";
