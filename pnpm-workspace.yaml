@@ -18,6 +18,6 @@ versioning:
     - "@cutils-example/todo-app-postgres"
     - "@cutils-example/todo-app-mongo"
   fixed:
-    - ["@cutils/sqlite", "@cutils/postgres", "@cutils/mongo", "@chttp/cache", "@chttp/mcp", "@chttp/auth"]
+    - ["@cutils/sqlite", "@cutils/postgres", "@cutils/mongo", "@chttp/cache"]
   changelog:
     storage: repository
