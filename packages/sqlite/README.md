@@ -85,6 +85,37 @@ All SQLite failures throw `SqliteError` with `code` = the SQLite result name
 `sqlite3_errmsg` at throw time. Schema failures use code `"VALIDATION"`;
 bind misuse `"BIND_PARAM"`; statement-busy `"STMT_BUSY"`.
 
+## Compile to ELF
+
+ELF consumers import the `./elf` export and compile the package's shipped JS
+statically with `--npm-static`:
+
+```ts
+import { Database } from "@cutils/sqlite/elf";
+```
+
+The shipped JS emits raw `shim_*` FFI calls; scriptc resolves them only when
+the consumer's own program carries the ambient signature-only declarations.
+Copy the shipped `elf/shims.d.ts` beside your entry and reference it:
+
+```ts
+/// <reference path="./shims.d.ts" />
+import { Database } from "@cutils/sqlite/elf";
+```
+
+Then build with `--npm-static` plus the shipped FFI manifest:
+
+```sh
+cp node_modules/@cutils/sqlite/elf/shims.d.ts ./shims.d.ts
+scriptc build app.ts --npm-static @cutils/sqlite \
+  --ffi node_modules/@cutils/sqlite/ffi.json
+```
+
+`ffi.json` is a copy of `vendor/manifest.json` with `libraries` rewritten to
+the package-relative `./build/libsqlite3-shim.a` (the tarball ships the
+archive). Do not pass `vendor/manifest.json` — its `../build/...` path only
+resolves inside this repo.
+
 ## Binary size
 
 Indicative `scriptc build` sizes for a scriptc app (your app's size varies —
