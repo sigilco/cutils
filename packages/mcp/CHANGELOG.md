@@ -1,5 +1,11 @@
 # @chttp/mcp
 
+## 0.2.0
+
+### Patch Changes
+
+- Wire ELF smoke into pnpm test; resolve scriptc via workspace .bin instead of pnpm exec
+
 ## 0.1.0
 
 ### Minor Changes

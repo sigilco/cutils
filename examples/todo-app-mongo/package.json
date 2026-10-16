@@ -7,9 +7,9 @@
     "start": "node --experimental-strip-types src/main.ts"
   },
   "dependencies": {
-    "@cutils/mongo": "workspace:^",
     "@chttp/router": "^0.2.1",
-    "@chttp/val": "^0.2.1"
+    "@chttp/val": "^0.2.1",
+    "@cutils/mongo": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
