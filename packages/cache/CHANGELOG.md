@@ -1,5 +1,11 @@
 # @cutils/cache
 
+## 0.3.0
+
+### Minor Changes
+
+- Rename @chttp/cache to @cutils/cache (scope correction; same code, same API).
+
 ## 0.2.0
 
 ## 0.1.0
