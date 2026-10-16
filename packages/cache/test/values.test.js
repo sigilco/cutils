@@ -1,4 +1,4 @@
-// Value round-trip tests for @chttp/cache — runs on the tsc build
+// Value round-trip tests for @cutils/cache — runs on the tsc build
 // (node --test). The memory cache stores live references (no JSON
 // encode/decode); the null-vs-miss contract is exercised via has().
 import { test } from "node:test";

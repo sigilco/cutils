@@ -1,9 +1,9 @@
-# @chttp/cache
+# @cutils/cache
 
 Map-based LRU + TTL in-process memory cache with [lru-cache](https://github.com/isaacs/node-lru-cache)-parity semantics, authored inside the [scriptc](https://github.com/vercel-labs/scriptc) compilable subset — it compiles into a native ELF alongside a [chttp](https://github.com/sigilco/chttp) app with `scriptc build`, and runs under Node unchanged.
 
 ```ts
-import { Cache } from "@chttp/cache";
+import { Cache } from "@cutils/cache";
 
 const sessions: Cache<string> = new Cache({ max: 10_000, ttl: 60_000 });
 
@@ -42,7 +42,7 @@ declare class Cache<V> {
 
 Deliberate, documented — every one is a subset constraint or a YAGNI call:
 
-| lru-cache                                                   | @chttp/cache                                                                         |
+| lru-cache                                                   | @cutils/cache                                                                        |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `V \| undefined` misses                                     | `V \| null` misses; `has()` disambiguates                                            |
 | `new LRUCache<K, V>()` (typed keys + values)                | `Cache<V>` phantom-generic alias — keys are `string`, values narrow at the call site |
@@ -86,7 +86,7 @@ Backend clients live as greppable examples (an Upstash REST store is the recomme
 
 ## Tests
 
-`pnpm --filter @chttp/cache test` builds with tsc, runs the `node --test` suite (LRU order, TTL via the injected clock, value round-trips, a real `@chttp/router` handler chain over HTTP) and the ELF smoke (`test/elf.test.sh`: `scriptc build` + native run). `scripts/scriptc-gate.sh` keeps `gate.ts` at 100% static coverage.
+`pnpm --filter @cutils/cache test` builds with tsc, runs the `node --test` suite (LRU order, TTL via the injected clock, value round-trips, a real `@chttp/router` handler chain over HTTP) and the ELF smoke (`test/elf.test.sh`: `scriptc build` + native run). `scripts/scriptc-gate.sh` keeps `gate.ts` at 100% static coverage.
 
 ## License
 

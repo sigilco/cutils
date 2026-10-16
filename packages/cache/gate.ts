@@ -1,4 +1,4 @@
-// scriptc coverage gate — exercises the full @chttp/cache public surface.
+// scriptc coverage gate — exercises the full @cutils/cache public surface.
 // scripts/scriptc-gate.sh requires `compile statically (100%)` here.
 
 import { Cache, CacheCore } from "./src/index.ts";

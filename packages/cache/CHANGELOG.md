@@ -1,4 +1,4 @@
-# @chttp/cache
+# @cutils/cache
 
 ## 0.2.0
 

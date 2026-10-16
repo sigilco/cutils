@@ -28,7 +28,7 @@ Publish and pack with pnpm only (`pnpm publish`, `pnpm pack`), never `npm publis
 These are hard bans wherever a package ships in the subset (each package's AGENTS.md may add more). The shared rationale lives in `ARCHITECTURE.md`.
 
 - `| null` unions only. Never `undefined` (SC3004) — the one documented exception is `@cutils/sqlite`'s `Stmt.get`, which ships `getOrNull` as the subset-strict twin.
-- No `Map`/`Set`/`Object.create(null)`/`Object.freeze` unless a package's AGENTS.md documents a probe-verified exception (e.g. `@chttp/cache` uses `Map`, lifted by the 0.3.3 probe).
+- No `Map`/`Set`/`Object.create(null)`/`Object.freeze` unless a package's AGENTS.md documents a probe-verified exception (e.g. `@cutils/cache` uses `Map`, lifted by the 0.3.3 probe).
 - Plain `({})` records with full shapes; no function values inside records (indices into parallel class-side arrays instead).
 - Indexed `for` loops (and `for...of` over arrays). Never `for...in`. No recursion where a call could monomorphize `unknown`.
 - No `?.` / `??`, no object or method shorthand in literals, no spread, no `eval`/`new Function`, no non-program `instanceof`.

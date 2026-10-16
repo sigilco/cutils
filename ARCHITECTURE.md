@@ -5,7 +5,7 @@ cutils hosts the utility packages of the chttp/scriptc ecosystem. Two scopes, on
 ## Scopes
 
 - **`@cutils/*`** — general-purpose utilities that own their own C dependency and ship it behind an FFI shim (`@cutils/sqlite`; the pattern for the DB family, `@cutils/postgres`/`@cutils/mongo` later). The C library is vendored, the shim is ~26 fixed signatures, and the TypeScript wrapper is the only user-facing surface.
-- **`@chttp/*`** — request-scoped utilities that are a web-server concern, pure TypeScript over the same subset, no C. Most live in the [chttp](https://github.com/sigilco/chttp) monorepo; only `@chttp/cache` still ships from here.
+- **`@chttp/*`** — request-scoped utilities that are a web-server concern, pure TypeScript over the same subset, no C. Most live in the [chttp](https://github.com/sigilco/chttp) monorepo; only `@cutils/cache` still ships from here.
 
 ## The Standard-Schema seam
 
@@ -18,7 +18,7 @@ The subset is what makes `scriptc build` able to lower program code into a stati
 - **`| null` unions only** — `| undefined` refuses (SC3004). Misses return `null`; `has()`/explicit sentinels disambiguate. `@cutils/sqlite.get()` is the single documented exception (`| undefined`, matching better-sqlite3) with `getOrNull()` as the subset-strict twin.
 - **No generics on classes, no class unions** — scriptc 0.3.x lowers generic class instances and `A | B` class unions to methodless shells. Narrow to `*Core` non-generic classes plus type-level aliases; use `T | null` and wrap-at-callsite adapters instead of union parameters.
 - **Records can't hold functions** — function-typed record fields degrade instantiation to `unknown`. Callbacks live in parallel arrays on the owning class; registrations store indices.
-- **No ambient `Map`/`Set`** — banned by default; a package may lift a specific container when a probe verifies it (0.3.3 lifted `Map`/`Set` for `@chttp/cache`'s LRU).
+- **No ambient `Map`/`Set`** — banned by default; a package may lift a specific container when a probe verifies it (0.3.3 lifted `Map`/`Set` for `@cutils/cache`'s LRU).
 - **FFI is executable-only** — `declare function` + a JSON manifest + object files/archives on `scriptc build --ffi`. The shim is stateless, every signature is fixed-width (`i64`, `f64`, `cstring`, `mutable-bytes` out-params), and text/blob/errmsg flow through caller-owned buffers.
 
 ## Gates

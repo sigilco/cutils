@@ -1,4 +1,4 @@
-// @chttp/cache — public surface.
+// @cutils/cache — public surface.
 //
 // The runtime class is the non-generic CacheCore: generic CLASS
 // parameters degrade instances to methodless shells under scriptc
