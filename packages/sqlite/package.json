@@ -12,6 +12,8 @@
     "dist",
     "src",
     "vendor",
+    "elf",
+    "ffi.json",
     "build/libsqlite3-shim.a"
   ],
   "type": "module",
@@ -23,7 +25,8 @@
       "import": "./dist/esm/index.js"
     },
     "./package.json": "./package.json",
-    "./node-binding": "./dist/esm/node-binding.mjs"
+    "./node-binding": "./dist/esm/node-binding.mjs",
+    "./elf": "./dist/esm/index.js"
   },
   "scripts": {
     "build:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -c vendor/shim/sqlite_shim.c -o build/sqlite_shim.o",
@@ -32,9 +35,10 @@
     "build:lib": "ranlib build/libsqlite3-shim.a",
     "build:shared": "cc -O2 -fPIC -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -Wl,-Bsymbolic -shared vendor/shim/sqlite_shim.c vendor/sqlite-amalgamation/sqlite3.c -o build/libcutils_sqlite.so",
     "build:ts": "tsc -p tsconfig.json",
-    "build": "mkdir -p build && npm run build:c && npm run build:sqlite && npm run build:archive && npm run build:lib && npm run build:ts && sed 's|\"\\.\\.\", \"build\"|\"..\", \"..\", \"build\"|' test/koffi-binding.mjs > dist/esm/node-binding.mjs",
+    "build:elf": "node scripts/emit-elf-shims.mjs",
+    "build": "mkdir -p build && npm run build:c && npm run build:sqlite && npm run build:archive && npm run build:lib && npm run build:ts && sed 's|\"\\.\\.\", \"build\"|\"..\", \"..\", \"build\"|' test/koffi-binding.mjs > dist/esm/node-binding.mjs && npm run build:elf",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && npm run build:shared && npm run test:c && npm run test:node && bash test/elf.test.sh",
+    "test": "npm run build && npm run build:shared && npm run test:c && npm run test:node && bash test/elf.test.sh && bash test/consumer-elf.test.sh",
     "test:c": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA test/shim.test.c build/libsqlite3-shim.a -o build/shim_test -lm && ./build/shim_test",
     "test:node": "node --test test/*.test.js test/*.test.mjs"
   },
