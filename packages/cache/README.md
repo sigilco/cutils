@@ -42,7 +42,7 @@ declare class Cache<V> {
 
 Deliberate, documented — every one is a subset constraint or a YAGNI call:
 
-| lru-cache                                                   | @cutils/cache                                                                         |
+| lru-cache                                                   | @cutils/cache                                                                        |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `V \| undefined` misses                                     | `V \| null` misses; `has()` disambiguates                                            |
 | `new LRUCache<K, V>()` (typed keys + values)                | `Cache<V>` phantom-generic alias — keys are `string`, values narrow at the call site |

@@ -15,7 +15,7 @@
 
 ## lru-cache divergences (keep the README table in sync)
 
-| lru-cache                                                     | @cutils/cache                                                        | Why                                                           |
+| lru-cache                                                     | @cutils/cache                                                       | Why                                                           |
 | ------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `get`/`peek` return `V \| undefined`                          | `V \| null` (`unknown \| null` on the class)                        | SC3004 bans `\| undefined`; `has()` disambiguates stored-null |
 | `class LRUCache<K, V>`                                        | `Cache<V>` phantom alias over `CacheCore`; keys are always `string` | generic class params degrade to methodless shells             |
