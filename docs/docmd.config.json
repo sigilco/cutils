@@ -53,14 +53,6 @@
         {
           "title": "@chttp/cache",
           "path": "/cache"
-        },
-        {
-          "title": "@chttp/mcp",
-          "path": "/mcp"
-        },
-        {
-          "title": "@chttp/auth",
-          "path": "/auth"
         }
       ]
     }
