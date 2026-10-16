@@ -28,7 +28,7 @@ import type {
 import { StandardSchemaV1 } from "./types.ts";
 import { SqliteError, sqliteCodeName } from "./errors.ts";
 import { validateRow } from "./validate.ts";
-import { Scratch } from "./internal/buffer.ts";
+import { copyOut, ensure } from "./internal/buffer.ts";
 import { utf8Decode } from "./internal/utf8.ts";
 import { nextSavepoint } from "./internal/savepoint.ts";
 import {
@@ -244,35 +244,35 @@ class StmtCore implements Disposable {
   }
 
   _columnName(idx: number): string {
-    const n = ffiColumnName(this._stmt, idx, this._db._scratch.buf);
+    const n = ffiColumnName(this._stmt, idx, this._db._scratch);
     if (n < 0) {
       return "";
     }
-    if (n > this._db._scratch.buf.length) {
-      this._db._scratch.ensure(n);
-      const m = ffiColumnName(this._stmt, idx, this._db._scratch.buf);
+    if (n > this._db._scratch.length) {
+      this._db._scratch = ensure(this._db._scratch, n);
+      const m = ffiColumnName(this._stmt, idx, this._db._scratch);
       if (m < 0) {
         return "";
       }
-      return utf8Decode(this._db._scratch.buf, m);
+      return utf8Decode(this._db._scratch, m);
     }
-    return utf8Decode(this._db._scratch.buf, n);
+    return utf8Decode(this._db._scratch, n);
   }
 
   _columnMeta(idx: number, which: number): string | null {
-    const n = ffiColumnMeta(this._stmt, idx, which, this._db._scratch.buf);
+    const n = ffiColumnMeta(this._stmt, idx, which, this._db._scratch);
     if (n < 0) {
       return null;
     }
-    if (n > this._db._scratch.buf.length) {
-      this._db._scratch.ensure(n);
-      const m = ffiColumnMeta(this._stmt, idx, which, this._db._scratch.buf);
+    if (n > this._db._scratch.length) {
+      this._db._scratch = ensure(this._db._scratch, n);
+      const m = ffiColumnMeta(this._stmt, idx, which, this._db._scratch);
       if (m < 0) {
         return null;
       }
-      return utf8Decode(this._db._scratch.buf, m);
+      return utf8Decode(this._db._scratch, m);
     }
-    return utf8Decode(this._db._scratch.buf, n);
+    return utf8Decode(this._db._scratch, n);
   }
 
   _columnValue(idx: number): SqlValue {
@@ -289,34 +289,34 @@ class StmtCore implements Disposable {
       return ffiColumnDbl(this._stmt, idx);
     }
     if (t === COL_TEXT) {
-      const n = ffiColumnText(this._stmt, idx, this._db._scratch.buf);
+      const n = ffiColumnText(this._stmt, idx, this._db._scratch);
       if (n < 0) {
         return "";
       }
-      if (n > this._db._scratch.buf.length) {
-        this._db._scratch.ensure(n);
-        const m = ffiColumnText(this._stmt, idx, this._db._scratch.buf);
+      if (n > this._db._scratch.length) {
+        this._db._scratch = ensure(this._db._scratch, n);
+        const m = ffiColumnText(this._stmt, idx, this._db._scratch);
         if (m < 0) {
           return "";
         }
-        return utf8Decode(this._db._scratch.buf, m);
+        return utf8Decode(this._db._scratch, m);
       }
-      return utf8Decode(this._db._scratch.buf, n);
+      return utf8Decode(this._db._scratch, n);
     }
     if (t === COL_BLOB) {
-      const n = ffiColumnBlob(this._stmt, idx, this._db._scratch.buf);
+      const n = ffiColumnBlob(this._stmt, idx, this._db._scratch);
       if (n < 0) {
         return new Uint8Array(0);
       }
-      if (n > this._db._scratch.buf.length) {
-        this._db._scratch.ensure(n);
-        const m = ffiColumnBlob(this._stmt, idx, this._db._scratch.buf);
+      if (n > this._db._scratch.length) {
+        this._db._scratch = ensure(this._db._scratch, n);
+        const m = ffiColumnBlob(this._stmt, idx, this._db._scratch);
         if (m < 0) {
           return new Uint8Array(0);
         }
-        return this._db._scratch.copyOut(m);
+        return copyOut(this._db._scratch, m);
       }
-      return this._db._scratch.copyOut(n);
+      return copyOut(this._db._scratch, n);
     }
     return null;
   }
@@ -531,19 +531,19 @@ class StmtCore implements Disposable {
   }
 
   toString(): string {
-    const n = ffiExpandedSql(this._stmt, this._db._scratch.buf);
+    const n = ffiExpandedSql(this._stmt, this._db._scratch);
     if (n < 0) {
       return this._source;
     }
-    if (n > this._db._scratch.buf.length) {
-      this._db._scratch.ensure(n);
-      const m = ffiExpandedSql(this._stmt, this._db._scratch.buf);
+    if (n > this._db._scratch.length) {
+      this._db._scratch = ensure(this._db._scratch, n);
+      const m = ffiExpandedSql(this._stmt, this._db._scratch);
       if (m < 0) {
         return this._source;
       }
-      return utf8Decode(this._db._scratch.buf, m);
+      return utf8Decode(this._db._scratch, m);
     }
-    return utf8Decode(this._db._scratch.buf, n);
+    return utf8Decode(this._db._scratch, n);
   }
 
   finalize(): void {
@@ -592,15 +592,45 @@ export interface Stmt<TRow = unknown> extends StmtCore {
 
 export const Stmt = StmtCore;
 
+// Live statements and open transactions per Database — kept in a
+// module-level registry, NOT on the class: a `StmtCore[]`/`Transaction[]`
+// field is a class-array member and refuses when the Database shape
+// crosses the npm-package boundary (SC2009), exactly like the old
+// `Scratch` field did across internal modules.
+interface DbTrack {
+  db: Database;
+  stmts: StmtCore[];
+  txs: Transaction[];
+}
+const DB_TRACK: DbTrack[] = [];
+
+function trackOf(db: Database): DbTrack {
+  for (let i = 0; i < DB_TRACK.length; i++) {
+    if (DB_TRACK[i].db === db) {
+      return DB_TRACK[i];
+    }
+  }
+  const t: DbTrack = { db: db, stmts: [], txs: [] };
+  DB_TRACK.push(t);
+  return t;
+}
+
+function dropTrack(db: Database): void {
+  for (let i = 0; i < DB_TRACK.length; i++) {
+    if (DB_TRACK[i].db === db) {
+      DB_TRACK.splice(i, 1);
+      return;
+    }
+  }
+}
+
 export class Database implements Disposable {
   _db: bigint;
   _path: string;
   _memory: boolean;
   _readonly: boolean;
   _closed: boolean;
-  _scratch: Scratch;
-  _stmts: StmtCore[];
-  _txs: Transaction[];
+  _scratch: Uint8Array;
 
   constructor(handle: bigint, path: string, memory: boolean, readonly_: boolean) {
     this._db = handle;
@@ -608,9 +638,7 @@ export class Database implements Disposable {
     this._memory = memory;
     this._readonly = readonly_;
     this._closed = false;
-    this._scratch = new Scratch();
-    this._stmts = [];
-    this._txs = [];
+    this._scratch = new Uint8Array(4096);
   }
 
   static open(path: string, opts?: OpenOpts): Database {
@@ -639,9 +667,9 @@ export class Database implements Disposable {
     }
     const rc = ffiErrcode(h);
     if (rc !== 0) {
-      const scratch = new Scratch();
-      const n = ffiErrmsg(h, scratch.buf);
-      const msg = n >= 0 ? utf8Decode(scratch.buf, n) : "open failed";
+      const scratch = new Uint8Array(4096);
+      const n = ffiErrmsg(h, scratch);
+      const msg = n >= 0 ? utf8Decode(scratch, n) : "open failed";
       ffiClose(h);
       throw new SqliteError(sqliteCodeName(rc), msg);
     }
@@ -680,19 +708,19 @@ export class Database implements Disposable {
   }
 
   _errmsg(): string {
-    const n = ffiErrmsg(this._db, this._scratch.buf);
+    const n = ffiErrmsg(this._db, this._scratch);
     if (n < 0) {
       return "sqlite error";
     }
-    if (n > this._scratch.buf.length) {
-      this._scratch.ensure(n);
-      const m = ffiErrmsg(this._db, this._scratch.buf);
+    if (n > this._scratch.length) {
+      this._scratch = ensure(this._scratch, n);
+      const m = ffiErrmsg(this._db, this._scratch);
       if (m < 0) {
         return "sqlite error";
       }
-      return utf8Decode(this._scratch.buf, m);
+      return utf8Decode(this._scratch, m);
     }
-    return utf8Decode(this._scratch.buf, n);
+    return utf8Decode(this._scratch, n);
   }
 
   _throwDb(rc: number, fallback: string): never {
@@ -700,7 +728,7 @@ export class Database implements Disposable {
     if (msg.length === 0) {
       msg = fallback;
     }
-    const txs = this._txs;
+    const txs = trackOf(this).txs;
     if (txs.length > 0) {
       txs[txs.length - 1]._failed = true;
     }
@@ -711,7 +739,7 @@ export class Database implements Disposable {
   }
 
   _untrack(stmt: StmtCore): void {
-    const arr = this._stmts;
+    const arr = trackOf(this).stmts;
     for (let i = 0; i < arr.length; i++) {
       if (arr[i] === stmt) {
         arr.splice(i, 1);
@@ -727,7 +755,7 @@ export class Database implements Disposable {
       this._throwDb(ffiErrcode(this._db), "prepare failed");
     }
     const stmt = new StmtCore(this, st, sql, schema);
-    this._stmts.push(stmt);
+    trackOf(this).stmts.push(stmt);
     return stmt;
   }
 
@@ -762,9 +790,10 @@ export class Database implements Disposable {
       if (rc !== 0) {
         this._throwDb(rc, "savepoint failed");
       }
-      const parent = this._txs.length > 0 ? this._txs[this._txs.length - 1] : null;
+      const txs = trackOf(this).txs;
+      const parent = txs.length > 0 ? txs[txs.length - 1] : null;
       const tx = new Transaction(this, parent, name);
-      this._txs.push(tx);
+      txs.push(tx);
       return tx;
     }
     const rc = ffiBegin(this._db);
@@ -772,7 +801,7 @@ export class Database implements Disposable {
       this._throwDb(rc, "begin failed");
     }
     const tx = new Transaction(this, null, null);
-    this._txs.push(tx);
+    trackOf(this).txs.push(tx);
     return tx;
   }
 
@@ -798,12 +827,13 @@ export class Database implements Disposable {
     if (this._closed) {
       return;
     }
-    const stmts = this._stmts;
+    const stmts = trackOf(this).stmts;
     for (let i = stmts.length - 1; i >= 0; i--) {
       stmts[i].finalize();
     }
     this._closed = true;
     ffiClose(this._db);
+    dropTrack(this);
   }
 
   [Symbol.dispose](): void {
@@ -837,7 +867,7 @@ export class Transaction implements Disposable {
   }
 
   _popSelf(): void {
-    const txs = this._db._txs;
+    const txs = trackOf(this._db).txs;
     for (let i = txs.length - 1; i >= 0; i--) {
       if (txs[i] === this) {
         txs.splice(i, 1);
@@ -872,7 +902,7 @@ export class Transaction implements Disposable {
       this._db._throwDb(rc, "savepoint failed");
     }
     const tx = new Transaction(this._db, this, name);
-    this._db._txs.push(tx);
+    trackOf(this._db).txs.push(tx);
     return tx;
   }
 
