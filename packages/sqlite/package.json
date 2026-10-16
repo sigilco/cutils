@@ -1,6 +1,6 @@
 {
   "name": "@cutils/sqlite",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Embedded SQLite for chttp/scriptc apps — vendored amalgamation, FFI shim, Standard-Schema row seam. Compiles to a single static ELF.",
   "license": "Apache-2.0",
   "repository": {

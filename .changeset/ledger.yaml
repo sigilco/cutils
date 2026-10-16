@@ -1,3 +1,7 @@
+"@chttp/auth@0.2.0":
+  dir: packages/auth
+  intents:
+    - neat-socks-hug
 "@chttp/cache@0.1.0":
   dir: packages/cache
   intents:
@@ -6,7 +10,25 @@
   dir: packages/mcp
   intents:
     - cool-cups-rule
+"@chttp/mcp@0.2.0":
+  dir: packages/mcp
+  intents:
+    - purple-rabbits-sing
+"@cutils/mongo@0.2.0":
+  dir: packages/mongo
+  intents:
+    - mean-teeth-dream
+"@cutils/postgres@0.2.0":
+  dir: packages/postgres
+  intents:
+    - tall-emus-look
 "@cutils/sqlite@0.1.0":
   dir: packages/sqlite
   intents:
     - loud-emus-own
+"@cutils/sqlite@0.2.0":
+  dir: packages/sqlite
+  intents:
+    - fast-pandas-report
+    - kind-mangos-try
+    - purple-rabbits-sing
