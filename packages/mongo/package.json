@@ -1,6 +1,6 @@
 {
   "name": "@cutils/mongo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Async, hand-rolled MongoDB wire-protocol driver (OP_MSG + BSON) for chttp/scriptc apps — node:net/tls/crypto only, no FFI. Compiles to a single static ELF.",
   "license": "Apache-2.0",
   "repository": {

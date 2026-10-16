@@ -3,6 +3,13 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.3.0
+
+### Features
+
+- **@cutils/cache:** Rename @chttp/cache to @cutils/cache (scope correction; same code, same API).
+<!-- release:end -->
+
 ## 0.2.0
 
 ### Features
@@ -16,7 +23,6 @@
 - **@chttp/mcp, @cutils/sqlite:** Wire ELF smoke into pnpm test; resolve scriptc via workspace .bin instead of pnpm exec
 - **@cutils/sqlite:** Fix empty string/blob binds landing as SQL NULL (empty span marshals as NULL pointer; shim substitutes a non-NULL literal)
 - **@cutils/sqlite:** Ship ./node-binding subpath (official koffi loader) + optional koffi peer; tests run on Node 22 (no using-syntax)
-<!-- release:end -->
 
 ## 0.1.0
 
