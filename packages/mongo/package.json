@@ -1,0 +1,58 @@
+{
+  "name": "@cutils/mongo",
+  "version": "0.1.0",
+  "description": "Async, hand-rolled MongoDB wire-protocol driver (OP_MSG + BSON) for chttp/scriptc apps — node:net/tls/crypto only, no FFI. Compiles to a single static ELF.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sigilco/cutils.git",
+    "directory": "packages/mongo"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.js test/*.test.mjs && bash test/elf.test.sh"
+  },
+  "devDependencies": {
+    "@chttp/val": "^0.2.1",
+    "@standard-schema/spec": "^1.1.0",
+    "@types/node": "^24.0.0",
+    "bson": "^6.10.0",
+    "mongodb": "^6.18.0",
+    "typescript": "^5.9.0",
+    "valibot": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "Joaquin Terrasa & contributors",
+  "keywords": [
+    "mongodb",
+    "mongo",
+    "database",
+    "bson",
+    "standard-schema",
+    "scriptc",
+    "native",
+    "elf"
+  ],
+  "homepage": "https://github.com/sigilco/cutils/tree/main/packages/mongo#readme",
+  "bugs": {
+    "url": "https://github.com/sigilco/cutils/issues"
+  },
+  "sideEffects": false
+}

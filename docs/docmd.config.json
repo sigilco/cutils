@@ -47,6 +47,10 @@
           "path": "/postgres"
         },
         {
+          "title": "@cutils/mongo",
+          "path": "/mongo"
+        },
+        {
           "title": "@chttp/cache",
           "path": "/cache"
         },
