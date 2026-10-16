@@ -43,6 +43,10 @@
           "path": "/sqlite"
         },
         {
+          "title": "@cutils/postgres",
+          "path": "/postgres"
+        },
+        {
           "title": "@chttp/cache",
           "path": "/cache"
         },

@@ -1,0 +1,436 @@
+// Wire-layer unit tests — MockSocket-driven, no Postgres needed. Covers
+// the message encoder/decoder pair, the named-parameter scanner, row
+// decoding, error parsing, and the PgSocket single-flight exchange.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createMockServer } from "./mock-server.mjs";
+
+const src = "../dist/esm";
+const { PgError, Database } = await import(`${src}/index.js`);
+const messages = await import(`${src}/internal/messages.js`);
+const buffer = await import(`${src}/internal/buffer.js`);
+const rows = await import(`${src}/internal/rows.js`);
+const socketMod = await import(`${src}/internal/socket.js`);
+const notifyMod = await import(`${src}/internal/notify.js`);
+
+// ---------- buffer ----------
+
+test("Writer/Msg round-trip big-endian primitives", () => {
+  const w = new buffer.Writer();
+  w.u8(0x51);
+  w.i16(-2);
+  w.i32(0x01020304);
+  w.cstr("héllo");
+  w.bytes(new Uint8Array([1, 2, 3]));
+  const m = new buffer.Msg(0x51, w.out().subarray(1));
+  assert.equal(m.i16(), -2);
+  assert.equal(m.i32(), 0x01020304);
+  assert.equal(m.cstr(), "héllo");
+  assert.deepEqual([...m.take(3)], [1, 2, 3]);
+});
+
+test("Reader de-frames split TCP chunks", () => {
+  const r = new buffer.Reader();
+  const full = messages.encQuery("SELECT 1");
+  const m2 = buffer.frame(
+    0x5a,
+    (() => {
+      const w = new buffer.Writer();
+      w.u8(0x49);
+      return w;
+    })(),
+  );
+  const all = new Uint8Array(full.length + m2.length);
+  all.set(full, 0);
+  all.set(m2, full.length);
+  r.feed(all.subarray(0, 3));
+  assert.equal(r.next(), null);
+  r.feed(all.subarray(3, 9));
+  assert.equal(r.next(), null);
+  r.feed(all.subarray(9));
+  const m1 = r.next();
+  assert.equal(m1.type, 0x51);
+  const mZ = r.next();
+  assert.equal(mZ.type, 0x5a);
+  assert.equal(r.next(), null);
+});
+
+// ---------- messages ----------
+
+test("encStartup emits version + kv pairs + terminator", () => {
+  const b = messages.encStartup({ user: "u", database: "d" });
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  assert.equal(v.getInt32(0), b.length);
+  assert.equal(v.getInt32(4), 196608);
+  const body = new TextDecoder().decode(b.subarray(8));
+  assert.ok(body.includes("user\u0000u"));
+  assert.ok(body.includes("database\u0000d"));
+  assert.equal(b[b.length - 1], 0);
+});
+
+test("encCancel is 16 bytes with the cancel code", () => {
+  const b = messages.encCancel(11, 22);
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  assert.equal(b.length, 16);
+  assert.equal(v.getInt32(4), 80877102);
+  assert.equal(v.getInt32(8), 11);
+  assert.equal(v.getInt32(12), 22);
+});
+
+test("decodeErrorFields parses S/V/C/M/D/H/P fields", () => {
+  const w = new buffer.Writer();
+  w.u8(0x53);
+  w.cstr("FATAL");
+  w.u8(0x56);
+  w.cstr("ERROR");
+  w.u8(0x43);
+  w.cstr("23505");
+  w.u8(0x4d);
+  w.cstr("duplicate key value");
+  w.u8(0x44);
+  w.cstr("Key (id)=(1) already exists.");
+  w.u8(0x48);
+  w.cstr("use another id");
+  w.u8(0x50);
+  w.cstr("13");
+  w.u8(0);
+  const m = new buffer.Msg(0x45, w.out());
+  const f = messages.decodeErrorFields(m);
+  assert.equal(f.code, "23505");
+  assert.equal(f.message, "duplicate key value");
+  assert.equal(f.severity, "ERROR");
+  assert.equal(f.detail, "Key (id)=(1) already exists.");
+  assert.equal(f.hint, "use another id");
+  assert.equal(f.position, 13);
+});
+
+test("decodeRowCount reads the last int of the tag", () => {
+  const mk = (tag) => {
+    const w = new buffer.Writer();
+    w.cstr(tag);
+    return new buffer.Msg(0x43, w.out());
+  };
+  assert.equal(messages.decodeRowCount(mk("SELECT 7")), 7);
+  assert.equal(messages.decodeRowCount(mk("INSERT 0 3")), 3);
+  assert.equal(messages.decodeRowCount(mk("BEGIN")), 0);
+});
+
+test("scanParams rewrites :name @name $name to $N", () => {
+  const s = messages.scanParams("SELECT * FROM t WHERE a = :id AND b = @done AND c = $title");
+  assert.equal(s.sql, "SELECT * FROM t WHERE a = $1 AND b = $2 AND c = $3");
+  assert.deepEqual(s.names, ["id", "done", "title"]);
+});
+
+test("scanParams skips literals, casts, comments, dollar quotes", () => {
+  const s = messages.scanParams(
+    "SELECT ':x' AS lit, y::text AS casted FROM t -- :incomment\n/* @also */ WHERE t.a = :real AND body = $$ :nope $$",
+  );
+  assert.equal(s.names.length, 1);
+  assert.deepEqual(s.names, ["real"]);
+  assert.ok(s.sql.includes("$1"));
+  assert.ok(s.sql.includes("':x'"));
+  assert.ok(s.sql.includes("::text"));
+  assert.ok(s.sql.includes("$$ :nope $$"));
+});
+
+test("scanParams dedupes repeated names", () => {
+  const s = messages.scanParams("SELECT :a, :b, :a");
+  assert.equal(s.sql, "SELECT $1, $2, $1");
+  assert.deepEqual(s.names, ["a", "b"]);
+});
+
+// ---------- rows ----------
+
+test("decodeText maps OIDs to SqlValue", () => {
+  assert.equal(rows.decodeText(16, "t"), true);
+  assert.equal(rows.decodeText(16, "f"), false);
+  assert.equal(rows.decodeText(23, "42"), 42);
+  assert.equal(rows.decodeText(701, "3.5"), 3.5);
+  assert.equal(rows.decodeText(25, "hi"), "hi");
+  assert.equal(rows.decodeText(20, "9007199254740993"), 9007199254740993n);
+  assert.equal(rows.decodeText(20, "7"), 7);
+  assert.equal(rows.decodeText(2950, "uuid-x"), "uuid-x");
+  // timestamps round-trip as ISO-8601 strings (Date can't live in a
+  // scriptc-compiled union — SC2009)
+  const ts = rows.decodeText(1184, "2026-10-15 12:30:00.5+00");
+  assert.equal(ts, "2026-10-15T12:30:00.500Z");
+  const ba = rows.decodeText(17, "\\x00ff");
+  assert.deepEqual([...ba], [0, 255]);
+});
+
+test("encodeText writes wire text", () => {
+  assert.equal(rows.encodeText(42), "42");
+  assert.equal(rows.encodeText(true), "t");
+  assert.equal(rows.encodeText(7n), "7");
+  assert.equal(rows.encodeText("s"), "s");
+  assert.equal(rows.encodeText(new Uint8Array([0, 255])), "\\x00ff");
+  // timestamps bind as ISO strings
+  assert.equal(rows.encodeText("2026-01-01T00:00:00.000Z"), "2026-01-01T00:00:00.000Z");
+});
+
+// ---------- PgSocket over a stub socket ----------
+
+function stubSocket() {
+  const handlers = {};
+  return {
+    written: [],
+    on(ev, cb) {
+      (handlers[ev] = handlers[ev] || []).push(cb);
+    },
+    once(ev, cb) {
+      (handlers[ev] = handlers[ev] || []).push(cb);
+    },
+    write(b) {
+      this.written.push(new Uint8Array(b));
+      return true;
+    },
+    destroy() {},
+    emit(ev, arg) {
+      (handlers[ev] || []).forEach((cb) => cb(arg));
+    },
+  };
+}
+
+test("PgSocket exchange serializes and dispatches by type", async () => {
+  const stub = stubSocket();
+  const pg = new socketMod.PgSocket(stub);
+  pg._wire();
+
+  const rowDescP = new buffer.Writer();
+  rowDescP.i16(1);
+  rowDescP.cstr("x");
+  rowDescP.i32(0);
+  rowDescP.i16(0);
+  rowDescP.i32(25);
+  rowDescP.i16(-1);
+  rowDescP.i32(-1);
+  rowDescP.i16(0);
+  const dataP = new buffer.Writer();
+  dataP.i16(1);
+  dataP.i32(2);
+  dataP.bytes(new TextEncoder().encode("hi"));
+  const cmdP = new buffer.Writer();
+  cmdP.cstr("SELECT 1");
+
+  const job = pg.run(async (ex) => {
+    stub.emit("data", buffer.frame(0x54, rowDescP));
+    stub.emit("data", buffer.frame(0x44, dataP));
+    stub.emit("data", buffer.frame(0x43, cmdP));
+    const zp = new buffer.Writer();
+    zp.u8(0x49);
+    stub.emit("data", buffer.frame(0x5a, zp));
+    const seen = [];
+    for (;;) {
+      const m = await ex.next();
+      if (m === null) break;
+      seen.push(m.type);
+    }
+    return seen;
+  });
+  const seen = await job;
+  assert.deepEqual(seen, [0x54, 0x44, 0x43]);
+  assert.equal(pg.txStatus, "I");
+});
+
+test("PgSocket routes notify + paramstatus + notices socket-side", async () => {
+  const stub = stubSocket();
+  const pg = new socketMod.PgSocket(stub);
+  pg._wire();
+  const np = new buffer.Writer();
+  np.i32(99);
+  np.cstr("ch");
+  np.cstr("pl");
+  const sp = new buffer.Writer();
+  sp.cstr("server_version");
+  sp.cstr("17.0");
+  stub.emit("data", buffer.frame(0x41, np));
+  stub.emit("data", buffer.frame(0x53, sp));
+  assert.equal(pg.param("server_version"), "17.0");
+  const drained = pg.drainNotify();
+  assert.equal(drained.length, 1);
+  assert.equal(drained[0].channel, "ch");
+  assert.equal(drained[0].payload, "pl");
+  assert.equal(drained[0].pid, 99);
+});
+
+test("notify.sqlQuoteIdent / sqlQuoteString escape", () => {
+  assert.equal(notifyMod.sqlQuoteIdent('a"b'), '"a""b"');
+  assert.equal(notifyMod.sqlQuoteString("a'b"), "'a''b'");
+  assert.equal(notifyMod.notifySql("c1", "p"), "NOTIFY \"c1\", 'p'");
+});
+
+// ---------- canned-server round trips (real TCP, no Postgres) ----------
+
+async function withServer(fn) {
+  const { srv, state } = createMockServer();
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const port = srv.address().port;
+  try {
+    await fn(port, state);
+  } finally {
+    srv.close();
+    for (const c of state.conns) c.destroy();
+  }
+}
+
+test("Database.connect + simple query + close over canned server", async () => {
+  await withServer(async (port, state) => {
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    assert.equal(db.backendPid, 4242);
+    assert.equal(db.serverVersion, "16.3");
+    await db.exec("CREATE TABLE x (a int)");
+    const res = await db.pragma("SELECT 1");
+    assert.equal(res.rows.length, 2);
+    await db.close();
+    assert.equal(state.startups, 1);
+  });
+});
+
+test("extended path: prepare, run, get/all, named + tuple binds", async () => {
+  await withServer(async (port) => {
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    const ins = await db.prepareRaw("INSERT INTO t (a,b) VALUES (:a, :b)");
+    const r = await ins.run({ a: 1, b: "x" });
+    assert.equal(r.rowCount, 1);
+    const sel = await db.prepareRaw("SELECT a, b FROM t WHERE a = $1");
+    const rows = await sel.all([1]);
+    assert.equal(rows.length, 2);
+    const row = await sel.getOrNull([1]);
+    assert.equal(row.id, 1);
+    assert.equal(row.title, "write docs");
+    assert.equal(row.done, true);
+    const cols = sel.columns();
+    assert.equal(cols[0].name, "id");
+    assert.equal(cols[0].type, "int4");
+    await db.close();
+  });
+});
+
+test("transaction lifecycle + savepoints", async () => {
+  await withServer(async (port, state) => {
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    const tx = await db.transaction();
+    assert.equal(db.inTransaction, true);
+    await tx.exec("INSERT INTO t VALUES (1)");
+    const inner = await tx.savepoint("s1");
+    await inner.rollback();
+    await tx.commit();
+    assert.equal(db.inTransaction, false);
+    const tags = state.queries.map((q) => q.trim().split(/\s+/)[0].toUpperCase());
+    assert.ok(tags.includes("BEGIN"));
+    assert.ok(tags.includes("SAVEPOINT"));
+    assert.ok(tags.includes("ROLLBACK"));
+    assert.ok(tags.includes("COMMIT"));
+    await db.close();
+  });
+});
+
+test("error surfaces as PgError with SQLSTATE", async () => {
+  await withServer(async (port) => {
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    await assert.rejects(
+      () => db.exec("select_fail now"),
+      (e) => {
+        assert.ok(e instanceof PgError);
+        assert.equal(e.code, "42601");
+        return true;
+      },
+    );
+    await db.close();
+  });
+});
+
+test("notify drains received events", async () => {
+  await withServer(async (port) => {
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    const r = await db.notify("chan", "payload-1");
+    assert.equal(r.received.length, 1);
+    assert.equal(r.received[0].channel, "chan");
+    assert.equal(r.received[0].payload, "payload-1");
+    await db.close();
+  });
+});
+
+test("cancel sends a CancelRequest on a fresh socket", async () => {
+  await withServer(async (port, state) => {
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    const stmt = await db.prepareRaw("SELECT 1");
+    await db.cancel(stmt);
+    // cancel resolves when the bytes are flushed; give the mock a tick to read them.
+    for (let i = 0; i < 50 && state.cancels === 0; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    assert.equal(state.cancels, 1);
+    await db.close();
+  });
+});
+
+test("ssl: require throws 0A000", async () => {
+  await assert.rejects(
+    () =>
+      Database.connect({
+        host: "127.0.0.1",
+        port: 1,
+        user: "u",
+        password: "p",
+        database: "d",
+        ssl: "require",
+      }),
+    (e) => e.code === "0A000",
+  );
+});
+
+test("cleartext + md5 auth paths", async () => {
+  for (const auth of ["clear", "md5"]) {
+    const { srv } = createMockServer({ auth: () => auth });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    const port = srv.address().port;
+    const db = await Database.connect({
+      host: "127.0.0.1",
+      port,
+      user: "u",
+      password: "p",
+      database: "d",
+    });
+    assert.equal(db.backendPid, 4242);
+    await db.close();
+    await new Promise((r) => srv.close(r));
+  }
+});
