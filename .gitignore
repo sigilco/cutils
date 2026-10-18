@@ -10,3 +10,4 @@ examples/*/dist/
 examples/*/app
 examples/*/.vendor/
 .agents/notes/*-handoff*.md
+elf/
