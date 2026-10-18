@@ -23,9 +23,13 @@ the safe-integer range, double otherwise.
 ## BsonDate
 
 A `Date` can't live in an `unknown` record slot under scriptc, so
-decoded dates are `BsonDate { ms, getTime(), toDate(), toISOString() }`.
+decoded dates are `BsonDate { ms, getTime() }`.
 Encode accepts all three forms — under plain Node `new Date()` works,
-in-subset pass `BsonDate` or the tagged record.
+in-subset pass `BsonDate` or the tagged record. Convert a decoded
+`BsonDate` with `new Date(d.ms)` or `new Date(d.ms).toISOString()` —
+`BsonDate` is method-free on purpose: a `Date`-producing method on the
+class trips SC9001 under scriptc when the instance crosses a dyn
+boundary.
 
 ## int64
 

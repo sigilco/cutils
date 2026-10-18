@@ -11,7 +11,21 @@ the field guide).
   is SC2006-refused; `unknown` is the subset-legal form of the same
   contract.
 - `BsonDate` instead of `Date` on decode — native handles have no
-  dynamic repr inside `unknown` slots.
+  dynamic repr inside `unknown` slots. It's method-free: a
+  `Date`-producing method trips SC9001 ("dynObjLit field value of kind
+  func") once an instance crosses a dyn boundary — convert via
+  `new Date(d.ms)`.
+- Missing-key reads on typed records throw "record has no key" — the
+  `get*`/`hasKey` helpers and the `$db`/`lsid`/URI-option reads test
+  `Object.keys(rec).indexOf(key)` before indexing.
+- `Collection.aggregate` returns `AggregateCursorCore`, not the
+  generic interface — generic methods are signature-only through an
+  interface receiver (SC1090). Annotate `AggregateCursor<TOut>` for
+  typed output.
+- Consumers can't `scriptc build` the package in place: `.ts` inside
+  `node_modules` is SC2009-refused and the dist JS fails surface
+  inference — vendor `src/` into the app (see README "Consuming under
+  scriptc build").
 - `CollectionCore` + `interface Collection<TDoc> extends CollectionCore`
   - `const Collection = CollectionCore` — generic class instances
     degrade to methodless shells; the interface alias keeps the typed

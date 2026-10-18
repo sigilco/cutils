@@ -231,7 +231,12 @@ export class CollectionCore implements AsyncDisposable {
     const hasId = typeof (doc as Document)["_id"] !== "undefined";
     if (!hasId) {
       const generated = ObjectId.generate();
-      docs[0]["_id"] = { kind: "objectId", v: generated.toHexString() };
+      // Assigning the tagged literal straight into docs[0] trips SC9001
+      // ("recordKeySet receiver: expected record, got union") — rebuild the
+      // first document and write it back instead.
+      const first: BsonDoc = toBsonDoc(doc as Document);
+      first["_id"] = { kind: "objectId", v: generated.toHexString() };
+      docs[0] = first;
       oid = generated.toHexString();
     } else {
       const idv = (doc as Document)["_id"];
@@ -476,7 +481,11 @@ export class CollectionCore implements AsyncDisposable {
     return result;
   }
 
-  aggregate<TOut extends Document = Document>(pipeline: Document[]): AggregateCursor<TOut> {
+  // Non-generic by necessity: calls to generic methods through the
+  // `Collection<TDoc>` interface receiver are signature-only under
+  // scriptc (SC1090) — the concrete `AggregateCursorCore` keeps the
+  // surface callable; annotate `AggregateCursor<TOut>` for typed output.
+  aggregate(pipeline: Document[]): AggregateCursorCore {
     const stages: BsonDoc[] = [];
     for (let i = 0; i < pipeline.length; i++) {
       stages.push(toBsonDoc(pipeline[i]));

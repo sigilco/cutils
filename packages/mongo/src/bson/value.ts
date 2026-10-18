@@ -20,8 +20,10 @@ import { Binary } from "./binary.ts";
 import { ObjectId } from "./objectid.ts";
 
 /** Date value wrapper — the subset-clean stand-in for `Date` inside
- * decoded documents. `toDate()`/`toISOString()` work under plain Node and
- * in the ELF. */
+ * decoded documents. Method-free by design: a `Date`-producing method on
+ * the class trips SC9001 ("dynObjLit field value of kind func") when the
+ * instance crosses a dyn boundary under scriptc. Convert with
+ * `new Date(d.ms)` / `new Date(d.ms).toISOString()`. */
 export class BsonDate {
   ms: number;
 
@@ -31,18 +33,6 @@ export class BsonDate {
 
   getTime(): number {
     return this.ms;
-  }
-
-  toDate(): Date {
-    return new Date(this.ms);
-  }
-
-  toISOString(): string {
-    return new Date(this.ms).toISOString();
-  }
-
-  toString(): string {
-    return this.toISOString();
   }
 }
 
@@ -114,12 +104,16 @@ export function vRegex(pattern: string, options: string): BsonValue {
 
 // ---------- reader helpers (0 / null / empty defaults) -----------------
 
+// Reading a missing key of a typed record throws under scriptc ("record has
+// no key") — every guarded read tests Object.keys membership first.
 export function hasKey(doc: BsonDoc, key: string): boolean {
-  const v = doc[key];
-  return typeof v !== "undefined";
+  return Object.keys(doc).indexOf(key) >= 0;
 }
 
 export function getVal(doc: BsonDoc, key: string): BsonValue | null {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return null;
+  }
   const v = doc[key];
   if (typeof v === "undefined") {
     return null;
@@ -128,6 +122,9 @@ export function getVal(doc: BsonDoc, key: string): BsonValue | null {
 }
 
 export function getNum(doc: BsonDoc, key: string): number {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return 0;
+  }
   const v = doc[key];
   if (typeof v === "undefined") {
     return 0;
@@ -139,6 +136,9 @@ export function getNum(doc: BsonDoc, key: string): number {
 }
 
 export function getStr(doc: BsonDoc, key: string): string {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return "";
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "string") {
     return "";
@@ -147,6 +147,9 @@ export function getStr(doc: BsonDoc, key: string): string {
 }
 
 export function getBool(doc: BsonDoc, key: string): boolean {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return false;
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "boolean") {
     return false;
@@ -155,6 +158,9 @@ export function getBool(doc: BsonDoc, key: string): boolean {
 }
 
 export function getDoc(doc: BsonDoc, key: string): BsonDoc | null {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return null;
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "object") {
     return null;
@@ -163,6 +169,9 @@ export function getDoc(doc: BsonDoc, key: string): BsonDoc | null {
 }
 
 export function getArr(doc: BsonDoc, key: string): BsonValue[] {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return [];
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "array") {
     return [];
@@ -334,7 +343,7 @@ export function unwrapForSchema(v: unknown): unknown {
       return v.bytes;
     }
     if (v instanceof BsonDate) {
-      return v.toISOString();
+      return new Date(v.ms).toISOString();
     }
     if (v instanceof Date) {
       return v.toISOString();

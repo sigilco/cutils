@@ -44,7 +44,26 @@ Cursors: `next()` `tryNext()` `hasNext()` `all()` `forEach(cb)`
 
 Values: `ObjectId` (`generate`, `fromHex`, `isHex`, `toHexString`,
 `equals`), `Binary` (`bytes`, `subType`, `toUUID`), `BsonDate` (`ms`,
-`toDate`, `toISOString`), `MongoError` (`code`, `codeName`).
+`getTime`; convert with `new Date(d.ms)`), `MongoError` (`code`,
+`codeName`).
+
+## Consuming under `scriptc build`
+
+`scriptc` refuses `.ts` sources inside `node_modules` (SC2009), and the
+published `dist/` JS no longer carries the declarations its surface
+inference needs — so vendor `src/` out of `node_modules` and import the
+copy (the package ships `src` in its tarball for exactly this):
+
+```sh
+cp -r node_modules/@cutils/mongo/src vendor/mongo
+```
+
+```ts
+import { MongoClient } from "./vendor/mongo/index.ts";
+```
+
+Importing `@cutils/mongo` directly keeps working under plain Node/Bun —
+only the scriptc-compiled app needs the vendored copy.
 
 ## Standard Schema seam
 

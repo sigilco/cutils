@@ -64,9 +64,9 @@ export class Session {
     await this.authenticate(
       parsed.user,
       parsed.pass,
-      parsed.options["authSource"],
+      optOr(parsed.options, "authSource"),
       parsed.dbName,
-      parsed.options["authMechanism"],
+      optOr(parsed.options, "authMechanism"),
     );
   }
 
@@ -95,8 +95,9 @@ export class Session {
     if (this.ch === null) {
       throw mongoError("NetworkError", "session not connected");
     }
-    const dbField = spec["$db"];
-    if (typeof dbField === "undefined") {
+    // A missing key on a typed record throws under scriptc — test
+    // membership instead of reading-then-checking for undefined.
+    if (Object.keys(spec).indexOf("$db") < 0) {
       spec["$db"] = vStr(db);
     }
     const id = this.nextId;
@@ -112,8 +113,7 @@ export class Session {
    * When a transaction is active on this session, stamps lsid/txnNumber/
    * autocommit (startTransaction on the first stamped command). */
   async command(db: string, spec: BsonDoc, seqs: DocSeq[]): Promise<BsonDoc> {
-    const lsidField = spec["lsid"];
-    if (this.activeTxn !== null && typeof lsidField === "undefined") {
+    if (this.activeTxn !== null && Object.keys(spec).indexOf("lsid") < 0) {
       txnFields(spec, this.activeTxn.lsid, this.activeTxn.txnNumber, this.activeTxn.started, false);
       this.activeTxn.started = false;
     }
@@ -171,9 +171,9 @@ export class Session {
     await this.authenticate(
       parsed.user,
       parsed.pass,
-      parsed.options["authSource"],
+      optOr(parsed.options, "authSource"),
       parsed.dbName,
-      parsed.options["authMechanism"],
+      optOr(parsed.options, "authMechanism"),
     );
   }
 
@@ -184,6 +184,15 @@ export class Session {
     }
     this.connected = false;
   }
+}
+
+/** String-valued record lookup that tolerates a missing key — a direct
+ * `o[k]` read throws "record has no key" under scriptc. */
+function optOr(o: { [k: string]: string }, k: string): string {
+  if (Object.keys(o).indexOf(k) < 0) {
+    return "";
+  }
+  return o[k];
 }
 
 function openChannel(
