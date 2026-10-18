@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   check(bin.toUUID().length === 36, "uuid format");
   const bd = new BsonDate(1737504000000);
   check(bd.getTime() === 1737504000000, "bsondate ms");
-  check(bd.toISOString() === "2025-01-22T00:00:00.000Z", "bsondate iso");
+  check(new Date(bd.ms).toISOString() === "2025-01-22T00:00:00.000Z", "bsondate iso");
 
   // --- BSON round-trip across all 11 shipped types ----------------------
   const nested: Document = { x: 1, y: "two" };

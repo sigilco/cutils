@@ -20,8 +20,10 @@ import { Binary } from "./binary.ts";
 import { ObjectId } from "./objectid.ts";
 
 /** Date value wrapper — the subset-clean stand-in for `Date` inside
- * decoded documents. `toDate()`/`toISOString()` work under plain Node and
- * in the ELF. */
+ * decoded documents. Method-free by design: a `Date`-producing method on
+ * the class trips SC9001 ("dynObjLit field value of kind func") when the
+ * instance crosses a dyn boundary under scriptc. Convert with
+ * `new Date(d.ms)` / `new Date(d.ms).toISOString()`. */
 export class BsonDate {
   ms: number;
 
@@ -31,18 +33,6 @@ export class BsonDate {
 
   getTime(): number {
     return this.ms;
-  }
-
-  toDate(): Date {
-    return new Date(this.ms);
-  }
-
-  toISOString(): string {
-    return new Date(this.ms).toISOString();
-  }
-
-  toString(): string {
-    return this.toISOString();
   }
 }
 
@@ -353,7 +343,7 @@ export function unwrapForSchema(v: unknown): unknown {
       return v.bytes;
     }
     if (v instanceof BsonDate) {
-      return v.toISOString();
+      return new Date(v.ms).toISOString();
     }
     if (v instanceof Date) {
       return v.toISOString();

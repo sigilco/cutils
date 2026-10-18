@@ -481,7 +481,11 @@ export class CollectionCore implements AsyncDisposable {
     return result;
   }
 
-  aggregate<TOut extends Document = Document>(pipeline: Document[]): AggregateCursor<TOut> {
+  // Non-generic by necessity: calls to generic methods through the
+  // `Collection<TDoc>` interface receiver are signature-only under
+  // scriptc (SC1090) — the concrete `AggregateCursorCore` keeps the
+  // surface callable; annotate `AggregateCursor<TOut>` for typed output.
+  aggregate(pipeline: Document[]): AggregateCursorCore {
     const stages: BsonDoc[] = [];
     for (let i = 0; i < pipeline.length; i++) {
       stages.push(toBsonDoc(pipeline[i]));
