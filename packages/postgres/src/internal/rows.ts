@@ -83,6 +83,7 @@ function parseTimestamp(text: string): Date {
 }
 
 /** Decode one TEXT-format column value to a SqlValue. */
+/** @param {number} oid @param {string} text */
 export function decodeText(oid: number, text: string): SqlValue {
   if (oid === OID_BOOL) {
     return text === "t" || text === "true";
@@ -120,6 +121,7 @@ function isIdentByte(c: number): boolean {
 }
 
 /** Decode a DataRow into positional SqlValues for a RowDescription. */
+/** @param {Msg} msg @param {{name: string, tableOid: number, attrNum: number, typeOid: number, typeSize: number, typeModifier: number, format: number}[]} cols */
 export function decodeDataRow(msg: Msg, cols: ColDesc[]): SqlValue[] {
   const count = msg.i16();
   const out: SqlValue[] = [];
@@ -136,6 +138,7 @@ export function decodeDataRow(msg: Msg, cols: ColDesc[]): SqlValue[] {
 }
 
 /** Parse a RowDescription payload into column descriptors. */
+/** @param {Msg} msg */
 export function decodeRowDescription(msg: Msg): ColDesc[] {
   const count = msg.i16();
   const cols: ColDesc[] = [];
@@ -154,8 +157,11 @@ export function decodeRowDescription(msg: Msg): ColDesc[] {
 }
 
 /** Build a Row record from positional values + column names. */
+/** @param {{name: string, tableOid: number, attrNum: number, typeOid: number, typeSize: number, typeModifier: number, format: number}[]} cols @param {unknown[]} vals */
 export function rowFromValues(cols: ColDesc[], vals: SqlValue[]): Record<string, SqlValue> {
-  const row: Record<string, SqlValue> = {};
+  // The JSDoc twin survives into dist JS: a declared dictionary type is
+  // what makes dynamic-key writes lower under --npm-static inference.
+  const row: Record<string, SqlValue> = /** @type {Record<string, unknown>} */ ({});
   for (let i = 0; i < vals.length; i++) {
     const name = i < cols.length ? cols[i].name : "col" + String(i);
     row[name] = vals[i];

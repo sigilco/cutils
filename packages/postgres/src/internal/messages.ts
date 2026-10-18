@@ -52,6 +52,7 @@ export const AUTH_SASL_CONTINUE: number = 11;
 export const AUTH_SASL_FINAL: number = 12;
 
 /** StartupMessage: unframed, version 3.0 + key/value pairs + NUL. */
+/** @param {Record<string, string>} params @returns {Uint8Array} */
 export function encStartup(params: Record<string, string>): Uint8Array {
   const w = new Writer();
   w.i32(PROTO_VERSION);
@@ -65,6 +66,7 @@ export function encStartup(params: Record<string, string>): Uint8Array {
 }
 
 /** CancelRequest: unframed, cancel code + pid + secret. */
+/** @param {number} pid @param {number} secret @returns {Uint8Array} */
 export function encCancel(pid: number, secret: number): Uint8Array {
   const w = new Writer(16);
   w.i32(CANCEL_CODE);
@@ -80,18 +82,21 @@ export function encSslRequest(): Uint8Array {
   return frameHeadless(w);
 }
 
+/** @param {Uint8Array} payload @returns {Uint8Array} */
 export function encPassword(payload: Uint8Array): Uint8Array {
   const w = new Writer(payload.length);
   w.bytes(payload);
   return frame(F_PASSWORD, w);
 }
 
+/** @param {string} sql @returns {Uint8Array} */
 export function encQuery(sql: string): Uint8Array {
   const w = new Writer(sql.length + 1);
   w.cstr(sql);
   return frame(F_QUERY, w);
 }
 
+/** @param {string} name @param {string} sql @returns {Uint8Array} */
 export function encParse(name: string, sql: string): Uint8Array {
   const w = new Writer();
   w.cstr(name);
@@ -100,6 +105,7 @@ export function encParse(name: string, sql: string): Uint8Array {
   return frame(F_PARSE, w);
 }
 
+/** @param {string} kind @param {string} name @returns {Uint8Array} */
 export function encDescribe(kind: string, name: string): Uint8Array {
   const w = new Writer(name.length + 2);
   w.u8(kind.charCodeAt(0)); // 'S' statement | 'P' portal
@@ -107,6 +113,7 @@ export function encDescribe(kind: string, name: string): Uint8Array {
   return frame(F_DESCRIBE, w);
 }
 
+/** @param {string} stmtName @param {string[]} texts @param {boolean[]} nulls @returns {Uint8Array} */
 export function encBind(stmtName: string, texts: string[], nulls: boolean[]): Uint8Array {
   const w = new Writer();
   w.cstr(""); // unnamed portal
@@ -129,6 +136,7 @@ export function encBind(stmtName: string, texts: string[], nulls: boolean[]): Ui
 
 const enc8 = new TextEncoder();
 
+/** @param {number} maxRows @returns {Uint8Array} */
 export function encExecute(maxRows: number): Uint8Array {
   const w = new Writer(5);
   w.cstr(""); // unnamed portal
@@ -136,6 +144,7 @@ export function encExecute(maxRows: number): Uint8Array {
   return frame(F_EXECUTE, w);
 }
 
+/** @param {string} kind @param {string} name @returns {Uint8Array} */
 export function encClose(kind: string, name: string): Uint8Array {
   const w = new Writer(name.length + 2);
   w.u8(kind.charCodeAt(0));
@@ -156,6 +165,7 @@ export function encTerminate(): Uint8Array {
 }
 
 /** Concatenate frames into one socket write. */
+/** @param {Uint8Array[]} frames @returns {Uint8Array} */
 export function joinFrames(frames: Uint8Array[]): Uint8Array {
   let total = 0;
   for (let i = 0; i < frames.length; i++) {
@@ -173,6 +183,7 @@ export function joinFrames(frames: Uint8Array[]): Uint8Array {
 // ---------- Backend parsers ----------
 
 /** Parse ErrorResponse / NoticeResponse field bytes into PgErrorFields. */
+/** @param {import("./buffer.js").Msg} msg */
 export function decodeErrorFields(msg: Msg): PgErrorFields {
   let code = "";
   let message = "";
@@ -223,6 +234,7 @@ export interface NotifyMsg {
   payload: string;
 }
 
+/** @param {Msg} msg */
 export function decodeNotify(msg: Msg): NotifyMsg {
   const pid = msg.i32();
   const channel = msg.cstr();
@@ -235,6 +247,7 @@ export interface ParamStatus {
   value: string;
 }
 
+/** @param {Msg} msg */
 export function decodeParamStatus(msg: Msg): ParamStatus {
   const name = msg.cstr();
   const value = msg.cstr();
@@ -242,6 +255,7 @@ export function decodeParamStatus(msg: Msg): ParamStatus {
 }
 
 /** CommandComplete tag → affected row count (last int in the tag). */
+/** @param {import("./buffer.js").Msg} msg */
 export function decodeRowCount(msg: Msg): number {
   const tag = msg.cstr();
   let end = tag.length;
@@ -284,6 +298,7 @@ function isDigit(c: number): boolean {
  * String literals, quoted identifiers, comments, dollar-quoted bodies and
  * the `::` cast operator are skipped.
  */
+/** @param {string} src */
 export function scanParams(src: string): ScannedSql {
   const names: string[] = [];
   let out = "";

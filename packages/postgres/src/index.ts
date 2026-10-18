@@ -144,6 +144,16 @@ class StmtCore implements AsyncDisposable {
   _finalized: boolean;
   _bound: BindPack | null;
 
+  /**
+   * @param {Database} db
+   * @param {string} name
+   * @param {string} source
+   * @param {string} sql
+   * @param {string[]} paramNames
+   * @param {Array<{name: string, tableOid: number, attrNum: number, typeOid: number, typeSize: number, typeModifier: number, format: number}>} cols
+   * @param {number} paramCount
+   * @param {unknown} schema
+   */
   constructor(
     db: Database,
     name: string,
@@ -212,7 +222,9 @@ class StmtCore implements AsyncDisposable {
       return { texts: texts, nulls: nulls };
     }
     if (Array.isArray(params)) {
-      const arr = params as BindValue[];
+      // The JS emit keeps this cast: Array.isArray narrows to any[], which
+      // scriptc's --npm-static JS inference cannot lower — unknown[] can.
+      const arr = /** @type {unknown[]} */ (params);
       if (arr.length === 0) {
         return { texts: texts, nulls: nulls };
       }
@@ -491,6 +503,14 @@ export class Database implements AsyncDisposable {
   _stmts: StmtCore[];
   _txs: Transaction[];
 
+  /**
+   * @param {import("./internal/socket.js").PgSocket} sock
+   * @param {string} host
+   * @param {number} port
+   * @param {string} database
+   * @param {string} user
+   * @param {number} connectTimeoutMs
+   */
   constructor(
     sock: PgSocket,
     host: string,
@@ -510,6 +530,9 @@ export class Database implements AsyncDisposable {
     this._txs = [];
   }
 
+  /**
+   * @param {{host: string, port?: number, user: string, password: string, database: string, ssl?: string, applicationName?: string, connectTimeoutMs?: number, statementTimeoutMs?: number}} opts
+   */
   static async connect(opts: ConnectOpts): Promise<Database> {
     let port = 5432;
     if (typeof opts.port === "number") {
@@ -811,11 +834,11 @@ export class Database implements AsyncDisposable {
     sql: string,
     schema: Schema,
   ): Promise<Stmt<InferOutput<Schema>>> {
-    return Promise.resolve(this._prepareCore(sql, schema));
+    return this._prepareCore(sql, schema);
   }
 
   prepareRaw(sql: string): Promise<Stmt<unknown>> {
-    return Promise.resolve(this._prepareCore(sql, null));
+    return this._prepareCore(sql, null);
   }
 
   /**
@@ -892,6 +915,7 @@ export class Transaction implements AsyncDisposable {
   _done: boolean;
   _failed: boolean;
 
+  /** @param {Database} db @param {Transaction | null} parent @param {string | null} savepoint */
   constructor(db: Database, parent: Transaction | null, savepoint: string | null) {
     this._db = db;
     this._parent = parent;
@@ -946,12 +970,12 @@ export class Transaction implements AsyncDisposable {
     schema: Schema,
   ): Promise<Stmt<InferOutput<Schema>>> {
     this._checkLive();
-    return Promise.resolve(this._db._prepareCore(sql, schema));
+    return this._db._prepareCore(sql, schema);
   }
 
   prepareRaw(sql: string): Promise<Stmt<unknown>> {
     this._checkLive();
-    return Promise.resolve(this._db._prepareCore(sql, null));
+    return this._db._prepareCore(sql, null);
   }
 
   async savepoint(name: string): Promise<Transaction> {

@@ -20,12 +20,13 @@
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./elf": "./dist/esm/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/*.test.js test/*.test.mjs && bash test/elf.test.sh"
+    "test": "npm run build && node --test test/*.test.js test/*.test.mjs && bash test/elf.test.sh && bash test/consumer-elf.test.sh"
   },
   "devDependencies": {
     "@chttp/val": "^0.2.1",

@@ -121,6 +121,25 @@ the implementation is original. If you used that driver:
 `node-postgres` (`pg`) users: no `Pool`, no `client.query` promise API,
 no COPY, no SSL — by design; the entire surface is ~17 methods.
 
+## Compile to ELF
+
+ELF consumers import the `./elf` export and compile the package's shipped JS
+statically with `--npm-static`:
+
+```ts
+import { Database } from "@cutils/postgres/elf";
+```
+
+```sh
+scriptc build app.ts --npm-static @cutils/postgres -o app-elf
+```
+
+No FFI manifest or shims are needed — the driver lowers on `node:net` +
+`node:crypto` alone. The shipped JS carries JSDoc type annotations because
+`--npm-static` compiles it with inference (the `.d.ts` surface is hidden);
+do not import `@cutils/postgres` bare under `--npm-static` — that resolves to
+`src/` TypeScript, which needs the workspace's `deps/` builtins.
+
 ## Docs in this package
 
 - `docs/integration.md` — connection lifecycle, transactions, errors,

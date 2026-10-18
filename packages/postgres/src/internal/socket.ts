@@ -46,6 +46,7 @@ export class Exchange {
     this.key = null;
   }
 
+  /** @param {Msg} m */
   push(m: Msg): void {
     this._msgs.push(m);
     const w = this._waiter;
@@ -55,6 +56,7 @@ export class Exchange {
     }
   }
 
+  /** @param {string} txStatus */
   finish(txStatus: string): void {
     this._txStatus = txStatus;
     this._done = true;
@@ -111,7 +113,8 @@ export class PgSocket {
   _sock: Socket | null;
   _rx: Reader;
   _cur: Exchange | null;
-  _tail: Promise<void>;
+  /** Field initializer keeps the emitted JS type definite for --npm-static consumers. */
+  _tail: Promise<void> = Promise.resolve();
   _closed: boolean;
   _notices: PgError[];
   _notify: NotifyMsg[];
@@ -120,11 +123,11 @@ export class PgSocket {
   _lastTxStatus: string;
   _onFatal: ((err: PgError) => void) | null;
 
+  /** @param {import("node:net").Socket} sock */
   constructor(sock: Socket) {
     this._sock = sock;
     this._rx = new Reader();
     this._cur = null;
-    this._tail = Promise.resolve();
     this._closed = false;
     this._notices = [];
     this._notify = [];
@@ -154,7 +157,13 @@ export class PgSocket {
     return null;
   }
 
-  /** TCP connect with timeout; wires the read dispatch. */
+  /**
+   * TCP connect with timeout; wires the read dispatch.
+   * @param {string} host
+   * @param {number} port
+   * @param {number} timeoutMs
+   * @returns {Promise<PgSocket>}
+   */
   static connect(host: string, port: number, timeoutMs: number): Promise<PgSocket> {
     return new Promise<PgSocket>((resolve, reject) => {
       let settled = false;
@@ -272,6 +281,7 @@ export class PgSocket {
     }
   }
 
+  /** @param {string} msg */
   _fatal(msg: string): void {
     if (this._closed) {
       return;
@@ -307,6 +317,7 @@ export class PgSocket {
   }
 
   /** Write bytes to the socket. */
+  /** @param {Uint8Array} bytes */
   send(bytes: Uint8Array): void {
     const s = this._sock;
     if (s === null) {
@@ -325,42 +336,36 @@ export class PgSocket {
   /**
    * Single-flight: run `job` holding the exchange slot. Serializes all
    * protocol exchanges on this connection.
+   * @template T
+   * @param {function(Exchange): Promise<T>} job
+   * @returns {Promise<T>}
    */
-  run<T>(job: (ex: Exchange) => Promise<T>): Promise<T> {
+  async run<T>(job: (ex: Exchange) => Promise<T>): Promise<T> {
     const start = this._tail;
     let release: () => void = () => {};
     this._tail = new Promise<void>((r) => {
       release = r;
     });
-    return start.then(() => {
-      if (this._closed) {
-        release();
-        return Promise.reject(
-          new PgError({
-            code: "CONNECTION",
-            message: "connection is closed",
-            severity: "ERROR",
-            detail: null,
-            hint: null,
-            position: null,
-          }),
-        );
-      }
-      const ex = new Exchange();
-      this._cur = ex;
-      return job(ex).then(
-        (v) => {
-          this._cur = null;
-          release();
-          return v;
-        },
-        (e) => {
-          this._cur = null;
-          release();
-          throw e;
-        },
-      );
-    });
+    await start;
+    if (this._closed) {
+      release();
+      throw new PgError({
+        code: "CONNECTION",
+        message: "connection is closed",
+        severity: "ERROR",
+        detail: null,
+        hint: null,
+        position: null,
+      });
+    }
+    const ex = new Exchange();
+    this._cur = ex;
+    try {
+      return await job(ex);
+    } finally {
+      this._cur = null;
+      release();
+    }
   }
 
   /** Drain notifications received since the last call. */
