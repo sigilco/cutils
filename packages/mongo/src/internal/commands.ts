@@ -161,7 +161,11 @@ export function txnFields(
 ): void {
   spec["lsid"] = vObj(lsid);
   spec["txnNumber"] = vI64(txnNumber);
-  spec["startTransaction"] = vBool(start);
+  // mongod >=8 rejects `startTransaction: false` outright — the field is
+  // only legal when present-and-true, so omit it otherwise.
+  if (start) {
+    spec["startTransaction"] = vBool(true);
+  }
   spec["autocommit"] = vBool(autocommit);
 }
 
