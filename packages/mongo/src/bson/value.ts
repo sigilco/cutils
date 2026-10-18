@@ -114,12 +114,16 @@ export function vRegex(pattern: string, options: string): BsonValue {
 
 // ---------- reader helpers (0 / null / empty defaults) -----------------
 
+// Reading a missing key of a typed record throws under scriptc ("record has
+// no key") — every guarded read tests Object.keys membership first.
 export function hasKey(doc: BsonDoc, key: string): boolean {
-  const v = doc[key];
-  return typeof v !== "undefined";
+  return Object.keys(doc).indexOf(key) >= 0;
 }
 
 export function getVal(doc: BsonDoc, key: string): BsonValue | null {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return null;
+  }
   const v = doc[key];
   if (typeof v === "undefined") {
     return null;
@@ -128,6 +132,9 @@ export function getVal(doc: BsonDoc, key: string): BsonValue | null {
 }
 
 export function getNum(doc: BsonDoc, key: string): number {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return 0;
+  }
   const v = doc[key];
   if (typeof v === "undefined") {
     return 0;
@@ -139,6 +146,9 @@ export function getNum(doc: BsonDoc, key: string): number {
 }
 
 export function getStr(doc: BsonDoc, key: string): string {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return "";
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "string") {
     return "";
@@ -147,6 +157,9 @@ export function getStr(doc: BsonDoc, key: string): string {
 }
 
 export function getBool(doc: BsonDoc, key: string): boolean {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return false;
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "boolean") {
     return false;
@@ -155,6 +168,9 @@ export function getBool(doc: BsonDoc, key: string): boolean {
 }
 
 export function getDoc(doc: BsonDoc, key: string): BsonDoc | null {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return null;
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "object") {
     return null;
@@ -163,6 +179,9 @@ export function getDoc(doc: BsonDoc, key: string): BsonDoc | null {
 }
 
 export function getArr(doc: BsonDoc, key: string): BsonValue[] {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return [];
+  }
   const v = doc[key];
   if (typeof v === "undefined" || v.kind !== "array") {
     return [];
