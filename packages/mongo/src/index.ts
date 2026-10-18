@@ -231,7 +231,12 @@ export class CollectionCore implements AsyncDisposable {
     const hasId = typeof (doc as Document)["_id"] !== "undefined";
     if (!hasId) {
       const generated = ObjectId.generate();
-      docs[0]["_id"] = { kind: "objectId", v: generated.toHexString() };
+      // Assigning the tagged literal straight into docs[0] trips SC9001
+      // ("recordKeySet receiver: expected record, got union") — rebuild the
+      // first document and write it back instead.
+      const first: BsonDoc = toBsonDoc(doc as Document);
+      first["_id"] = { kind: "objectId", v: generated.toHexString() };
+      docs[0] = first;
       oid = generated.toHexString();
     } else {
       const idv = (doc as Document)["_id"];
