@@ -10,6 +10,7 @@ export class Writer {
   _buf: Uint8Array;
   _len: number;
 
+  /** @param {number} [capacity] */
   constructor(capacity?: number) {
     let cap = 256;
     if (typeof capacity === "number" && capacity > 0) {
@@ -80,6 +81,7 @@ export class Writer {
 }
 
 /** Wrap the payload in the `type + int32 length` framing. */
+/** @param {number} type @param {Writer} payload @returns {Uint8Array} */
 export function frame(type: number, payload: Writer): Uint8Array {
   const w = new Writer(payload._len + 5);
   w.u8(type);
@@ -89,6 +91,7 @@ export function frame(type: number, payload: Writer): Uint8Array {
 }
 
 /** Unframed message (startup-style packets have no type byte). */
+/** @param {Writer} payload @returns {Uint8Array} */
 export function frameHeadless(payload: Writer): Uint8Array {
   const w = new Writer(payload._len + 4);
   w.i32(payload._len + 4);
@@ -103,6 +106,7 @@ export class Msg {
   _b: Uint8Array;
   _off: number;
 
+  /** @param {number} type @param {Uint8Array} payload */
   constructor(type: number, payload: Uint8Array) {
     this.type = type;
     this._b = payload;
@@ -171,10 +175,12 @@ export class Msg {
 
 const dec = new TextDecoder();
 
+/** @param {Uint8Array} b @param {number} start @param {number} end @returns {string} */
 export function utf8DecodeRange(b: Uint8Array, start: number, end: number): string {
   return dec.decode(b.subarray(start, end));
 }
 
+/** @param {Uint8Array} b @returns {string} */
 export function utf8Decode(b: Uint8Array): string {
   return dec.decode(b);
 }
@@ -194,6 +200,7 @@ export class Reader {
     this._off = 0;
   }
 
+  /** @param {Uint8Array} chunk */
   feed(chunk: Uint8Array): void {
     if (this._len + chunk.length > this._buf.length) {
       this._compact();
@@ -248,6 +255,7 @@ export class Reader {
 
 const HEX: string = "0123456789abcdef";
 
+/** @param {Uint8Array} b @returns {string} */
 export function hexEncode(b: Uint8Array): string {
   const w = new Writer(b.length * 2);
   for (let i = 0; i < b.length; i++) {

@@ -6,6 +6,13 @@ import { createConnection } from "node:net";
 import { encCancel } from "./messages.ts";
 import { PgError } from "../errors.ts";
 
+/**
+ * @param {string} host
+ * @param {number} port
+ * @param {number} pid
+ * @param {number} secret
+ * @param {number} timeoutMs
+ */
 export function sendCancel(
   host: string,
   port: number,

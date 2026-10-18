@@ -56,6 +56,7 @@ function copyError(): PgError {
  * Parse + Describe 'S' + Sync: prepares `sql` server-side as `name` and
  * returns its row-shape metadata. `cols` is empty for non-row statements.
  */
+/** @param {import("./socket.js").PgSocket} sock @param {string} name @param {string} sql */
 export async function prepareOn(sock: PgSocket, name: string, sql: string): Promise<PreparedMeta> {
   return sock.run(async (ex: Exchange) => {
     sock.send(joinFrames([encParse(name, sql), encDescribe("S", name), encSync()]));
@@ -94,6 +95,14 @@ export async function prepareOn(sock: PgSocket, name: string, sql: string): Prom
  * `cols` is the statement's RowDescription from prepare time — the portal
  * inherits it, so DataRows decode against it without a second Describe.
  * When `cols` is empty we ask for the portal's RowDescription instead.
+ */
+/**
+ * @param {import("./socket.js").PgSocket} sock
+ * @param {string} stmtName
+ * @param {string[]} texts
+ * @param {boolean[]} nulls
+ * @param {{name: string, tableOid: number, attrNum: number, typeOid: number, typeSize: number, typeModifier: number, format: number}[]} knownCols
+ * @param {number} maxRows
  */
 export async function executeOn(
   sock: PgSocket,
@@ -153,6 +162,12 @@ export async function executeOn(
  * Parse + Bind + Describe 'P' + Execute + Sync against the UNNAMED
  * statement: the `execute(sql, args)` path — no statement cache, one shot.
  */
+/**
+ * @param {import("./socket.js").PgSocket} sock
+ * @param {string} sql
+ * @param {string[]} texts
+ * @param {boolean[]} nulls
+ */
 export async function queryUnnamed(
   sock: PgSocket,
   sql: string,
@@ -207,6 +222,7 @@ export async function queryUnnamed(
 }
 
 /** Close 'S' + Sync: server-side DEALLOCATE for `finalize()`. */
+/** @param {import("./socket.js").PgSocket} sock @param {string} name */
 export async function closeStatement(sock: PgSocket, name: string): Promise<void> {
   return sock.run(async (ex: Exchange) => {
     if (sock.closed) {

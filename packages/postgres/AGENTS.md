@@ -19,6 +19,32 @@ Hand-rolled async Postgres wire driver in the scriptc subset: StartupMessage
   `test/mock-server.mjs` over real TCP, expects `gate OK`. The TCP-from-ELF
   leg is the point: it proves `node:net` + `node:crypto` lower.
 - `scriptc coverage gate.ts` — must report 100% static.
+- `bash test/consumer-elf.test.sh` — packs the tarball, installs it into a
+  scratch app under `build/consumer-smoke/`, compiles `gate.ts` against
+  `@cutils/postgres/elf` with `--npm-static`, runs the ELF vs the mock
+  server. Any break there is a packaging regression, not a subset failure.
+
+## Consumer compile contract (`--npm-static`)
+
+- `./elf` (→ `./dist/esm/index.js`) is the consumer entry. scriptc's
+  `--npm-static` compiles the shipped JS with inference: export conditions
+  and `.ts` targets resolve to nothing for it, so `./elf` stays a plain
+  string and the bare `@cutils/postgres` import is workspace-only.
+- The `.d.ts` surface is hidden in that mode — types the JS cannot infer
+  must come from JSDoc that survives `tsc` into `dist/esm`:
+  - `@param`/`@returns` on every public/internal signature whose params
+    would infer `unknown` (unknown-instantiated calls defer to runtime
+    fences — SC2020 sites that only fire when reached).
+  - Cross-file class types use `import("./socket.js").PgSocket` — type-only
+    imports are erased at runtime so they cost nothing.
+  - Interfaces/type aliases can't be named (no `.d.ts`) — spell them as
+    inline literal object types in the JSDoc (see `rowFromValues`' cols).
+  - JS field decls without initializers infer `T | undefined` — initialize
+    class fields inline (see `PgSocket._tail`).
+  - `Array.isArray` narrows to `any[]`, which scriptc won't lower — cast
+    with `/** @type {unknown[]} */` (see `_encodeParams`).
+  - Dictionary writes need a declared record: `const row: Rec = /** @type
+{Record<string, unknown>} */ ({});` (see `rowFromValues`).
 
 ## Layout
 

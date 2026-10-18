@@ -40,6 +40,7 @@ function copyError(): PgError {
  * Run one simple query inside an exchange slot. Drains until
  * ReadyForQuery; throws PgError on ErrorResponse after the drain.
  */
+/** @param {import("./socket.js").PgSocket} sock @param {string} sql */
 export async function simpleQuery(sock: PgSocket, sql: string): Promise<SimpleResult> {
   return sock.run(async (ex: Exchange) => {
     sock.send(encQuery(sql));

@@ -30,18 +30,22 @@ function scramError(msg: string): PgError {
   });
 }
 
+/** @param {Uint8Array} key @param {string} data @returns {Uint8Array} */
 function hmacSha256(key: Uint8Array, data: string): Uint8Array {
   return new Uint8Array(createHmac("sha256", key).update(data).digest());
 }
 
+/** @param {Uint8Array} data @returns {Uint8Array} */
 function sha256(data: Uint8Array): Uint8Array {
   return new Uint8Array(createHash("sha256").update(data).digest());
 }
 
+/** @param {string} data @returns {string} */
 function md5Hex(data: string): string {
   return createHash("md5").update(data).digest("hex");
 }
 
+/** @param {Uint8Array} b @returns {string} */
 function b64encode(b: Uint8Array): string {
   // Minimal base64 — scriptc's lowered surface has no Buffer.
   const table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -71,6 +75,7 @@ function b64encode(b: Uint8Array): string {
   return out;
 }
 
+/** @param {string} s @returns {Uint8Array} */
 function b64decode(s: string): Uint8Array {
   const table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   const rev: number[] = [];
@@ -102,6 +107,7 @@ function b64decode(s: string): Uint8Array {
   return out.out();
 }
 
+/** @param {Uint8Array} a @param {Uint8Array} b @returns {Uint8Array} */
 function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
   const out = new Uint8Array(a.length);
   for (let i = 0; i < a.length; i++) {
@@ -111,6 +117,7 @@ function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
 }
 
 /** SASL-escape a username: `=` → `=3D`, `,` → `=2C`. */
+/** @param {string} s */
 function scramName(s: string): string {
   let out = "";
   for (let i = 0; i < s.length; i++) {
@@ -131,6 +138,7 @@ interface ScramState {
   clientFirstBare: string;
 }
 
+/** @param {string} msg @param {string} key */
 function parseAttr(msg: string, key: string): string {
   // server-first/final are `k=v,k=v,...`; v runs to the next comma.
   const prefix = key + "=";
@@ -150,11 +158,14 @@ function parseAttr(msg: string, key: string): string {
 }
 
 export class Scram {
+  /** @type {string} */
   _password: string;
+  /** @type {string} */
   _user: string;
   _state: ScramState | null;
   _serverSignature: Uint8Array | null;
 
+  /** @param {string} user @param {string} password */
   constructor(user: string, password: string) {
     this._user = user;
     this._password = password;
@@ -178,7 +189,8 @@ export class Scram {
     return enc.encode(msg);
   }
 
-  /** SASLContinue (auth 11) → SASLResponse payload. */
+  /** SASLContinue (auth 11) → SASLResponse payload.
+   * @param {string} serverFirst */
   serverFirst(serverFirst: string): Uint8Array {
     const st = this._state;
     if (st === null) {
@@ -195,7 +207,9 @@ export class Scram {
       throw scramError("SCRAM bad iteration count");
     }
     const salt = b64decode(saltB64);
-    const salted = new Uint8Array(pbkdf2Sync(this._password, salt, iterations, 32, "sha256"));
+    // Local read keeps the JS-inferred type definite for --npm-static consumers.
+    const password = this._password;
+    const salted = new Uint8Array(pbkdf2Sync(password, salt, iterations, 32, "sha256"));
     const clientKey = hmacSha256(salted, "Client Key");
     const storedKey = sha256(clientKey);
     const clientFinalBare = "c=biws,r=" + nonce;
@@ -231,6 +245,12 @@ export class Scram {
  * Drive the authentication phase against an open exchange. Consumes 'R'
  * messages until AuthenticationOk; returns when auth is done (the caller
  * keeps reading until ReadyForQuery).
+ */
+/**
+ * @param {import("./socket.js").Exchange} ex
+ * @param {function(Uint8Array): void} send
+ * @param {string} user
+ * @param {string} password
  */
 export async function authenticate(
   ex: Exchange,
