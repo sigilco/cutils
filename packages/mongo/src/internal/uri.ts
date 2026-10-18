@@ -54,6 +54,16 @@ function decodeComponent(s: string): string {
   return out;
 }
 
+/** String.prototype.lastIndexOf is not lowered under scriptc — scan back. */
+function lastIndexOfChar(s: string, ch: string): number {
+  for (let i = s.length - 1; i >= 0; i--) {
+    if (s.charAt(i) === ch) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 function parseHostSpec(spec: string): SeedHost[] {
   const seeds: SeedHost[] = [];
   const parts = spec.split(",");
@@ -62,7 +72,7 @@ function parseHostSpec(spec: string): SeedHost[] {
     if (p === "") {
       continue;
     }
-    const colon = p.lastIndexOf(":");
+    const colon = lastIndexOfChar(p, ":");
     let host = p;
     let port = 27017;
     if (colon > 0) {
@@ -96,7 +106,7 @@ export function parseUri(uri: string): ParsedUri {
   }
 
   // auth@ prefix
-  const at = authority.lastIndexOf("@");
+  const at = lastIndexOfChar(authority, "@");
   let hostSpec = authority;
   if (at >= 0) {
     const auth = authority.slice(0, at);
