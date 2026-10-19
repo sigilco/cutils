@@ -3,7 +3,7 @@
 // aggregate/count/distinct/findAndModify + txn commands) built here.
 
 import type { BsonDoc, BsonValue } from "../bson/value.ts";
-import { vArr, vBool, vI32, vI64, vObj, vStr } from "../bson/value.ts";
+import { vArr, vBool, vI32, vI64, vI64Raw, vObj, vStr } from "../bson/value.ts";
 import type { FindOpts } from "../types.ts";
 
 export function findSpec(coll: string, filter: BsonDoc, opts: FindOpts | null): BsonDoc {
@@ -85,9 +85,9 @@ export function deleteEntry(q: BsonDoc, limit: number): BsonDoc {
   return e;
 }
 
-export function getMoreSpec(cursorId: number, coll: string, batchSize: number | null): BsonDoc {
+export function getMoreSpec(cursorId: bigint, coll: string, batchSize: number | null): BsonDoc {
   const spec: BsonDoc = {};
-  spec["getMore"] = vI64(cursorId);
+  spec["getMore"] = vI64Raw(cursorId);
   spec["collection"] = vStr(coll);
   if (batchSize !== null) {
     spec["batchSize"] = vI64(batchSize);
@@ -95,12 +95,12 @@ export function getMoreSpec(cursorId: number, coll: string, batchSize: number | 
   return spec;
 }
 
-export function killCursorsSpec(coll: string, ids: number[]): BsonDoc {
+export function killCursorsSpec(coll: string, ids: bigint[]): BsonDoc {
   const spec: BsonDoc = {};
   spec["killCursors"] = vStr(coll);
   const arr: BsonValue[] = [];
   for (let i = 0; i < ids.length; i++) {
-    arr.push(vI64(ids[i]));
+    arr.push(vI64Raw(ids[i]));
   }
   spec["cursors"] = vArr(arr);
   return spec;

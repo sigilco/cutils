@@ -129,9 +129,9 @@ async function main(): Promise<void> {
   // --- command-spec builders ---------------------------------------------
   const fs = findSpec("t", toBsonDoc({ a: 1 }), null);
   check(getStr(fs, "find") === "t", "find spec");
-  const gm = getMoreSpec(42, "t", 10);
+  const gm = getMoreSpec(BigInt(42), "t", 10);
   check(getNum(gm, "getMore") === 42, "getMore spec");
-  const kc = killCursorsSpec("t", [42]);
+  const kc = killCursorsSpec("t", [BigInt(42)]);
   check(getStr(kc, "killCursors") === "t", "killCursors spec");
   const ue = updateEntry(toBsonDoc({ a: 1 }), toBsonDoc({ $set: { b: 2 } }), false, false);
   check(ue.q !== undefined, "update entry q");

@@ -6,10 +6,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CursorCore } from "../dist/esm/internal/cursor.js";
 import { MongoError } from "../dist/esm/errors.js";
-import { vI64, vObj } from "../dist/esm/bson/value.js";
+import { vI64, vI64Raw, vObj } from "../dist/esm/bson/value.js";
 
 function cursorBody(id, batchKey, docs) {
-  const cursor = { id: vI64(id), ns: { kind: "string", v: "db.t" } };
+  const cursor = { id: vI64Raw(BigInt(id)), ns: { kind: "string", v: "db.t" } };
   cursor[batchKey] = { kind: "array", v: docs.map((d) => vObj(d)) };
   return { ok: { kind: "double", v: 1 }, cursor: vObj(cursor) };
 }
@@ -53,6 +53,26 @@ test("next drains firstBatch then getMores to exhaustion", async () => {
   assert.equal(await cur.next(), null);
   assert.equal(session.calls.length, 2); // two getMores
   assert.equal(session.calls[0].getMore.v, 99);
+});
+
+test("getMore/killCursors re-encode >2^53 cursor ids losslessly (#32)", async () => {
+  // Real mongod cursor ids are random int64s, almost always above the
+  // f64 safe-integer bound — the lossy getNum path rounded this to
+  // ...592 and the server answered CursorNotFound (code 43).
+  const big = 2166240671379054593n; // Number(big) === ...592 — f64-lossy
+  const first = cursorBody(big, "firstBatch", [{ a: vI64(1) }]);
+  const session = fakeSession([
+    { id: big, docs: [{ a: vI64(2) }] },
+    { id: 0n, docs: [] },
+  ]);
+  const cur = new CursorCore(session, init, first);
+  assert.equal((await cur.next()).a.v, 1);
+  assert.equal((await cur.next()).a.v, 2); // getMore fired
+  assert.equal(session.calls[0].getMore.raw, big);
+
+  const cur2 = new CursorCore(session, init, cursorBody(big, "firstBatch", [{ a: vI64(9) }]));
+  await cur2.close();
+  assert.equal(session.calls[1].cursors.v[0].raw, big);
 });
 
 test("tryNext only returns buffered docs; hasNext reflects liveness", async () => {
