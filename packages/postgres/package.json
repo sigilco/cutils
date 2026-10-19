@@ -1,6 +1,6 @@
 {
   "name": "@cutils/postgres",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Hand-rolled async Postgres wire-protocol driver for chttp/scriptc apps — node:net + node:crypto, Standard-Schema row seam, no FFI. Compiles to a single static ELF.",
   "license": "Apache-2.0",
   "repository": {

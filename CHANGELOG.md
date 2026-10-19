@@ -3,12 +3,31 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.4.0
+
+### Breaking
+
+- **@cutils/mongo:** **Breaking:** `BsonDate` drops its Date-producing methods (`toDate`/`toISOString`/`toString` — use `new Date(d.ms)`); `aggregate()` returns the concrete `AggregateCursorCore` — generic methods are signature-only through the Collection interface
+
+### Features
+
+- **@cutils/postgres:** Fix npm-consumer `scriptc build`: ship `./elf` export (dist JS compiled via `--npm-static`) plus JSDoc annotations the JS inference needs — definite field initializers, `import("./x.js").T` cross-file types, inline literal object types where `.d.ts` interfaces can't be named, `unknown[]` casts after `Array.isArray`, and a declared dictionary type for dynamic-key row writes. New `test/consumer-elf.test.sh` packs the tarball and builds a scratch app against it.
+- **@cutils/sqlite:** Fix npm-consumer `scriptc build`: ship `./elf` export (dist JS compiled via `--npm-static`), a consumer-facing `ffi.json` manifest, and `elf/shims.d.ts` ambient declarations; replace the `Scratch` class with `ensure`/`copyOut` helpers and move stmt/tx tracking to a module-level registry so no class instance crosses a module boundary.
+
+### Fixes
+
+- **@cutils/mongo:** mongo: guard missing-key reads on typed records — scriptc throws 'record has no key' instead of yielding undefined
+- **@cutils/mongo:** mongo: keep int64 cursor ids lossless — getMore/killCursors re-encode the raw bigint, fixing CursorNotFound on multi-batch cursors (#32)
+- **@cutils/mongo:** mongo: insertOne builds the generated-_id document via toBsonDoc — direct tagged-literal store trips SC9001 under scriptc
+- **@cutils/mongo:** mongo: omit startTransaction when false — mongod >=8 rejects the field outright
+- **@cutils/mongo:** mongo: replace String.lastIndexOf in URI parsing — unsupported when the published dist is compiled by scriptc 0.3.4
+<!-- release:end -->
+
 ## 0.3.0
 
 ### Features
 
 - **@cutils/cache:** Rename @chttp/cache to @cutils/cache (scope correction; same code, same API).
-<!-- release:end -->
 
 ## 0.2.0
 

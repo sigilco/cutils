@@ -1,6 +1,6 @@
 {
   "name": "@cutils/cache",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Map-based LRU+TTL memory cache with lru-cache-parity semantics, authored inside the scriptc compilable subset",
   "license": "Apache-2.0",
   "repository": {
