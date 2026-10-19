@@ -4,7 +4,7 @@
 // (subset doesn't lower it).
 
 import { mongoError } from "../errors.ts";
-import { getArr, getDoc, getNum } from "../bson/value.ts";
+import { getArr, getDoc, getI64Raw } from "../bson/value.ts";
 import type { BsonDoc } from "../bson/value.ts";
 import type { Session } from "./session.ts";
 import { getMoreSpec, killCursorsSpec } from "./commands.ts";
@@ -25,7 +25,12 @@ export class CursorCore implements AsyncDisposable {
   coll: string;
   batchSize: number | null;
   txn: { lsid: BsonDoc; txnNumber: number } | null;
+  /** Lossy f64 view of the server cursor id — for the `=== 0` checks and
+   * any diagnostic surface. Wire encoding always uses `idRaw`. */
   id: number;
+  /** Exact int64 cursor id: real ids are > 2^53, so only the raw bigint
+   * survives a getMore/killCursors round-trip. */
+  idRaw: bigint;
   buf: BsonDoc[];
   pos: number;
   done: boolean;
@@ -45,7 +50,8 @@ export class CursorCore implements AsyncDisposable {
     if (cursorDoc === null) {
       throw mongoError("ProtocolError", "reply has no cursor document");
     }
-    this.id = getNum(cursorDoc, "id");
+    this.idRaw = getI64Raw(cursorDoc, "id");
+    this.id = Number(this.idRaw);
     const first = getArr(cursorDoc, "firstBatch");
     const second = getArr(cursorDoc, "nextBatch");
     const batch = first.length > 0 ? first : second;
@@ -61,7 +67,7 @@ export class CursorCore implements AsyncDisposable {
   }
 
   async getMore(): Promise<void> {
-    const spec = getMoreSpec(this.id, this.coll, this.batchSize);
+    const spec = getMoreSpec(this.idRaw, this.coll, this.batchSize);
     if (this.txn !== null) {
       spec["lsid"] = { kind: "object", v: this.txn.lsid };
       spec["txnNumber"] = { kind: "int64", v: this.txn.txnNumber, raw: BigInt(this.txn.txnNumber) };
@@ -72,7 +78,8 @@ export class CursorCore implements AsyncDisposable {
     if (cursorDoc === null) {
       throw mongoError("ProtocolError", "getMore reply has no cursor document");
     }
-    this.id = getNum(cursorDoc, "id");
+    this.idRaw = getI64Raw(cursorDoc, "id");
+    this.id = Number(this.idRaw);
     const batch = getArr(cursorDoc, "nextBatch");
     this.buf = [];
     this.pos = 0;
@@ -159,12 +166,13 @@ export class CursorCore implements AsyncDisposable {
     this.closed = true;
     if (this.id !== 0 && this.session.connected) {
       try {
-        await this.session.command(this.db, killCursorsSpec(this.coll, [this.id]), []);
+        await this.session.command(this.db, killCursorsSpec(this.coll, [this.idRaw]), []);
       } catch (_e) {
         // Best-effort — a dead socket must not leak a throw from dispose.
       }
     }
     this.id = 0;
+    this.idRaw = BigInt(0);
     this.done = true;
   }
 

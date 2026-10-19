@@ -135,6 +135,26 @@ export function getNum(doc: BsonDoc, key: string): number {
   return 0;
 }
 
+/** Exact int64 payload as bigint — `getNum` returns the lossy f64 view,
+ * which drops precision on real MongoDB int64s above 2^53 (cursor ids,
+ * clusterTime/operationTime). Reads the `raw` the decoder preserved. */
+export function getI64Raw(doc: BsonDoc, key: string): bigint {
+  if (Object.keys(doc).indexOf(key) < 0) {
+    return BigInt(0);
+  }
+  const v = doc[key];
+  if (typeof v === "undefined") {
+    return BigInt(0);
+  }
+  if (v.kind === "int64") {
+    return v.raw;
+  }
+  if (v.kind === "int32" || v.kind === "double") {
+    return BigInt(v.v);
+  }
+  return BigInt(0);
+}
+
 export function getStr(doc: BsonDoc, key: string): string {
   if (Object.keys(doc).indexOf(key) < 0) {
     return "";

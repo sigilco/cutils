@@ -119,3 +119,26 @@ it("connect, insert, find, update, delete, aggregate, count, distinct, bulkWrite
 
   await client.close();
 });
+
+it("multi-batch find: getMore follows a live server cursor (#32)", async () => {
+  const client = await MongoClient.connect({ uri: URI, dbName: DB, appName: "cutils-test" });
+  const coll = client.database().collection("multibatch");
+  await coll.deleteMany({});
+  const docs = [];
+  for (let i = 0; i < 10; i++) {
+    docs.push({ n: i });
+  }
+  await coll.insertMany(docs);
+
+  // batchSize < doc count forces getMore round-trips on a >2^53 cursor id.
+  const all = await coll.find({}, { batchSize: 3, sort: { n: 1 } }).all();
+  assert.equal(all.length, 10);
+  assert.equal(all[9].n, 9);
+
+  // killCursors on a still-live cursor must carry the exact id too.
+  const live = coll.find({}, { batchSize: 3 });
+  await live.next();
+  await live.close();
+
+  await client.close();
+});
