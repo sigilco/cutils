@@ -22,10 +22,23 @@
   dir: packages/mongo
   intents:
     - mean-teeth-dream
+"@cutils/mongo@0.4.0":
+  dir: packages/mongo
+  intents:
+    - chilly-frogs-scream
+    - friendly-jokes-compete
+    - heavy-crabs-move
+    - purple-hats-love
+    - real-beans-agree
+    - vast-cobras-relate
 "@cutils/postgres@0.2.0":
   dir: packages/postgres
   intents:
     - tall-emus-look
+"@cutils/postgres@0.4.0":
+  dir: packages/postgres
+  intents:
+    - postgres-elf-entry
 "@cutils/sqlite@0.1.0":
   dir: packages/sqlite
   intents:
@@ -36,3 +49,7 @@
     - fast-pandas-report
     - kind-mangos-try
     - purple-rabbits-sing
+"@cutils/sqlite@0.4.0":
+  dir: packages/sqlite
+  intents:
+    - sqlite-elf-entry
