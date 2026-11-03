@@ -1,0 +1,16 @@
+[package]
+name = "cutils-ffi-echo"
+version = "0.4.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "repr(C) struct echo used by @cutils/ffi's scriptc format-7 smoke"
+
+[lib]
+name = "cutils_ffi_echo"
+crate-type = ["staticlib", "cdylib"]
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1

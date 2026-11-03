@@ -1,0 +1,73 @@
+{
+  "name": "@cutils/ffi",
+  "version": "0.4.0",
+  "description": "Shared scriptc format-7 FFI spec (sqlite's span ABI) plus a Rust struct-echo smoke. Compiles to a single static ELF.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sigilco/cutils.git",
+    "directory": "packages/ffi"
+  },
+  "files": [
+    "dist",
+    "src",
+    "native",
+    "vendor",
+    "elf",
+    "ffi.json",
+    "build/libcutils_ffi_echo.a",
+    "build/libcutils_ffi_echo.so",
+    "build/libcutils_ffi_echo.dylib"
+  ],
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    },
+    "./package.json": "./package.json",
+    "./node-binding": "./dist/esm/node-binding.mjs",
+    "./elf": "./dist/esm/index.js"
+  },
+  "scripts": {
+    "build:rust": "mkdir -p build && CARGO_TARGET_DIR=build/cargo cargo test --manifest-path native/Cargo.toml && CARGO_TARGET_DIR=build/cargo cargo build --release --manifest-path native/Cargo.toml && cp build/cargo/release/libcutils_ffi_echo.a build/libcutils_ffi_echo.a && node scripts/copy-shared.mjs build/cargo/release cutils_ffi_echo",
+    "build:ts": "tsc -p tsconfig.json",
+    "build:elf": "node scripts/emit-elf-shims.mjs",
+    "build": "npm run build:rust && npm run build:ts && sed 's|\"\\.\\.\", \"build\"|\"..\", \"..\", \"build\"|' test/koffi-binding.mjs > dist/esm/node-binding.mjs && npm run build:elf",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && npm run test:c && npm run test:node && bash test/elf.test.sh && bash test/consumer-elf.test.sh",
+    "test:c": "cc -O2 test/echo.test.c build/libcutils_ffi_echo.a -o build/echo_test -lpthread -ldl -lm && ./build/echo_test",
+    "test:node": "node --test test/*.test.js test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "koffi": "^2.14.1",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "koffi": "^2.14.1"
+  },
+  "peerDependenciesMeta": {
+    "koffi": {
+      "optional": true
+    }
+  },
+  "author": "Joaquin Terrasa & contributors",
+  "keywords": [
+    "ffi",
+    "scriptc",
+    "native",
+    "elf",
+    "span-abi"
+  ],
+  "homepage": "https://github.com/sigilco/cutils/tree/main/packages/ffi#readme",
+  "bugs": {
+    "url": "https://github.com/sigilco/cutils/issues"
+  },
+  "sideEffects": false
+}
