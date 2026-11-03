@@ -3,6 +3,13 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.5.0
+
+### Features
+
+- **@cutils/ffi:** Initial release: shared scriptc ffi_format 7 span ABI (same as @cutils/sqlite) with layout/buffer helpers and a Rust EchoPoint echo used as the ELF smoke.
+<!-- release:end -->
+
 ## 0.4.0
 
 ### Breaking
@@ -21,7 +28,6 @@
 - **@cutils/mongo:** mongo: insertOne builds the generated-_id document via toBsonDoc — direct tagged-literal store trips SC9001 under scriptc
 - **@cutils/mongo:** mongo: omit startTransaction when false — mongod >=8 rejects the field outright
 - **@cutils/mongo:** mongo: replace String.lastIndexOf in URI parsing — unsupported when the published dist is compiled by scriptc 0.3.4
-<!-- release:end -->
 
 ## 0.3.0
 
