@@ -37,6 +37,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # @cutils/ffi builds a Rust staticlib/cdylib in its build script
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/ffi/native
       - run: pnpm install --frozen-lockfile
       # a warm pnpm store cache restores scriptc's toolchain without exec bits
       - run: find node_modules/.pnpm -path '*@scriptc+cli-*/dist/lib/*' -type f -exec chmod +x {} +
@@ -82,6 +87,8 @@ jobs:
           node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      # @cutils/ffi's tarball carries the Rust-built archive and shared lib
+      - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
       # packages only: examples need scriptc's toolchain and are not published
       - run: pnpm --filter "./packages/*" build

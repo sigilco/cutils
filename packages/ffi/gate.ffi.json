@@ -1,0 +1,16 @@
+{
+  "ffi_format": 7,
+  "functions": [
+    { "name": "echo_size", "symbol": "echo_size", "params": [], "returns": "i32" },
+    { "name": "echo_i32", "symbol": "echo_i32", "params": ["i32"], "returns": "i32" },
+    { "name": "echo_i64", "symbol": "echo_i64", "params": ["i64"], "returns": "i64" },
+    {
+      "name": "echo_point",
+      "symbol": "echo_point",
+      "params": ["bytes", "mutable-bytes"],
+      "returns": "i32"
+    }
+  ],
+  "libraries": ["build/libcutils_ffi_echo.a"],
+  "system_libraries": ["pthread", "dl", "m"]
+}
