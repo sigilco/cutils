@@ -39,6 +39,10 @@
           "path": "/packages"
         },
         {
+          "title": "@cutils/ffi",
+          "path": "/ffi"
+        },
+        {
           "title": "@cutils/sqlite",
           "path": "/sqlite"
         },

@@ -3,7 +3,8 @@
 Each package installs from npm and works the same under Node and under `scriptc build`:
 
 ```sh
-pnpm add @cutils/sqlite   # embedded SQLite
+pnpm add @cutils/ffi       # shared format-7 FFI spec + struct echo
+pnpm add @cutils/sqlite    # embedded SQLite
 pnpm add @cutils/cache     # LRU + TTL memory cache
 ```
 
