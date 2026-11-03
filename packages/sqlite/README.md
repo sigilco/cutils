@@ -78,6 +78,13 @@ any nested op) threw or was marked failed — then it rolls back. Nested
 `db.transaction()` inside an open tx becomes an automatic savepoint;
 `tx.savepoint(name)` gives an explicit one with `commit()`/`rollback()`.
 
+`using`/`await using` are supported in the scriptc subset (see the root
+`AGENTS.md`, "using / resource disposal"). The `using` value must be declared
+with the class type — `Transaction`, not a `Disposable`-typed variable —
+otherwise disposal throws SC2020 at declaration runtime. This is why
+`using db.prepareRaw(...)` is impossible in-subset: `Stmt<TRow>` is an
+interface; call `finalize()` (or `[Symbol.dispose]()`) explicitly instead.
+
 ## Errors
 
 All SQLite failures throw `SqliteError` with `code` = the SQLite result name

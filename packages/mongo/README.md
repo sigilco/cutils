@@ -42,6 +42,13 @@ const n = await todos.deleteMany({ done: true });
 Cursors: `next()` `tryNext()` `hasNext()` `all()` `forEach(cb)`
 `close()` `[Symbol.asyncDispose]`. `findOne` returns `TDoc | null`.
 
+`await using` works on the async-disposable types (`MongoClient` and the
+cursor family). Subset fences (root `AGENTS.md`, "using / resource
+disposal"): the `using` value must be declared with the class type — through
+a `Disposable`-typed variable disposal throws SC2020 at declaration runtime;
+`await using` needs an async context; `[Symbol.asyncDispose]` must return
+exactly `Promise<void>`.
+
 Values: `ObjectId` (`generate`, `fromHex`, `isHex`, `toHexString`,
 `equals`), `Binary` (`bytes`, `subType`, `toUUID`), `BsonDate` (`ms`,
 `getTime`; convert with `new Date(d.ms)`), `MongoError` (`code`,
