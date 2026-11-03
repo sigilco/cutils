@@ -8,18 +8,23 @@
 // Command paths that need a live mongod stay behind test/mongo.test.js.
 
 import {
+  AggregateCursorCore,
   Binary,
   BsonDate,
+  CollectionCore,
+  FindCursorCore,
   MongoClient,
   MongoError,
   ObjectId,
   StandardSchemaV1,
   StdProps,
+  Transaction,
 } from "./src/index.ts";
 import type { Document } from "./src/index.ts";
 import { decodeDoc, encodeDoc } from "./src/internal/bson.ts";
 import { decodeMsg, DocSeq, encodeMsg } from "./src/internal/opmsg.ts";
 import { parseUri } from "./src/internal/uri.ts";
+import { Session } from "./src/internal/session.ts";
 import { fromBsonDoc, getNum, getStr, toBsonDoc, vI32, vObj, vStr } from "./src/bson/value.ts";
 import { findSpec, getMoreSpec, killCursorsSpec, updateEntry } from "./src/internal/commands.ts";
 import { validateDoc } from "./src/validate.ts";
@@ -148,6 +153,48 @@ async function main(): Promise<void> {
     }
   }
   check(threw, "schema reject");
+
+  // --- await using / [Symbol.asyncDispose] lowering ------------------------
+  // The README promises `await using client = await MongoClient.connect(...)`
+  // and documents [Symbol.asyncDispose] on six types. This row compiles the
+  // `await using` lowering for every disposable the package ships (client,
+  // database, collection, both cursors, transaction) through the same gate
+  // program, so the disposal path lands in the ELF.
+  //
+  // No live server: the client/transaction are built over an unconnected
+  // Session, so every dispose path runs against a socket-less session.
+  const sess = new Session({
+    uri: "mongodb://127.0.0.1:27017",
+    appName: "gate",
+    connectTimeoutMs: 100,
+    retryReads: false,
+    retryWrites: false,
+  });
+  {
+    await using client = new MongoClient(sess, {
+      uri: "mongodb://127.0.0.1:27017",
+      dbName: "gatedb",
+      appName: "gate",
+      connectTimeoutMs: 100,
+      retryReads: false,
+      retryWrites: false,
+    });
+    await using db = client.database("gatedb");
+    await using coll: CollectionCore = db.collection("todos");
+    await using cursor: FindCursorCore = coll.find({ done: false });
+    await using agg: AggregateCursorCore = coll.aggregate([]);
+    await using txn: Transaction = client.startTransaction();
+    check(client.dbName === "gatedb", "await using client");
+    check(db.name === "gatedb", "await using db");
+    check(coll.name === "todos", "await using collection");
+    check(cursor.coll === coll, "await using find cursor");
+    check(agg.coll === coll, "await using aggregate cursor");
+    check(txn.dbName === "", "await using transaction");
+    check(sess.activeTxn !== null, "transaction active in scope");
+  }
+  // The scope exited: Transaction[Symbol.asyncDispose] rolled the
+  // transaction back and released it on the session.
+  check(sess.activeTxn === null, "await using released the transaction");
 
   // --- public surface type smoke (no server calls) -------------------------
   const clientTypeCheck: (opts: {
