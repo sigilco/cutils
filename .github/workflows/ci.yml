@@ -15,6 +15,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # @cutils/ffi builds a Rust staticlib/cdylib in its build script
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/ffi/native
       - run: pnpm install --frozen-lockfile
       # a warm pnpm store cache restores scriptc's toolchain without exec bits
       - run: find node_modules/.pnpm -path '*@scriptc+cli-*/dist/lib/*' -type f -exec chmod +x {} +
@@ -34,6 +39,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # @cutils/ffi's gate links build/libcutils_ffi_echo.a, built by `pnpm -r build`
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/ffi/native
       - run: pnpm install --frozen-lockfile
       # a warm pnpm store cache restores scriptc's toolchain without exec bits
       - run: find node_modules/.pnpm -path '*@scriptc+cli-*/dist/lib/*' -type f -exec chmod +x {} +
