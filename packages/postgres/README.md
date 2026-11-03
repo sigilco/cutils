@@ -112,7 +112,12 @@ the implementation is original. If you used that driver:
   never had. `*Raw` skips it.
 - `pool`/`Client` lifecycle → `await using` + `[Symbol.asyncDispose]()`;
   there is no `Pool` class in v1 — hold connections yourself (a ~15-line
-  example lives in `docs/integration.md`).
+  example lives in `docs/integration.md`). Note the subset fences (root
+  `AGENTS.md`, "using / resource disposal"): `await using` needs an async
+  context, and the value must be declared with the class type
+  (`Client`/`Transaction`), not a `Disposable`-typed variable — the latter
+  throws SC2020 at declaration runtime. `[Symbol.asyncDispose]` must return
+  exactly `Promise<void>`.
 - LISTEN/NOTIFY is a drain (`db.notify` returns `{received}`), not a
   long-lived consumer.
 - Timestamps are ISO strings, not `Date` (scriptc union limitation).

@@ -36,6 +36,15 @@ These are hard bans wherever a package ships in the subset (each package's AGENT
 - Class generic parameters degrade instances to methodless shells on scriptc 0.3.x — narrow to non-generic core classes (`*Core`) with a type-level `interface X extends XCore` + `const X = XCore` alias when a generic-looking surface is needed.
 - Union types of classes/records are the second poison: `A | B` where either is a class or a function-bearing record refuses. `T | null` is the only allowed union arm.
 
+### `using` / resource disposal
+
+`using`, `await using`, and `for using` are supported (scriptc ≥ 0.3.6; this repo pins 0.4.7). Disposal pairs with `[Symbol.dispose]` (`@cutils/sqlite` Database/StmtCore/Transaction) and `[Symbol.asyncDispose]` (`@cutils/postgres`, `@cutils/mongo`).
+
+Two traps a contributor will hit without knowing them:
+
+- The `using` value must be declared with its **class type**. Through a `Disposable`- or interface-typed variable, disposal throws SC2020 at declaration runtime — the static type has no concrete lowering for dispose. Recorded at `packages/sqlite/gate.ts` ("`using` on a Stmt is impossible in-subset: the value's static type is the `Stmt<TRow>` interface, which has no concrete lowering for dispose").
+- Fences: top-level `using` is refused; `await using` requires an async context; `[Symbol.asyncDispose]` must return exactly `Promise<void>`.
+
 ## Conventions
 
 - Conventional commits, atomic commits (one logical change each).
