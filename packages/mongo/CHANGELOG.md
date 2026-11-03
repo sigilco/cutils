@@ -1,5 +1,7 @@
 # @cutils/mongo
 
+## 0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
@@ -12,7 +14,7 @@
 
 - mongo: keep int64 cursor ids lossless — getMore/killCursors re-encode the raw bigint, fixing CursorNotFound on multi-batch cursors (#32)
 
-- mongo: insertOne builds the generated-_id document via toBsonDoc — direct tagged-literal store trips SC9001 under scriptc
+- mongo: insertOne builds the generated-\_id document via toBsonDoc — direct tagged-literal store trips SC9001 under scriptc
 
 - mongo: omit startTransaction when false — mongod >=8 rejects the field outright
 
