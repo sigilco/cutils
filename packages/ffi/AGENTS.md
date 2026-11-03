@@ -51,3 +51,8 @@ Same as root AGENTS.md. Additional:
   scriptc rejects.
 - Do not add `@cutils/pty` or `@cutils/keyring` in this package; they are
   follow-up crates that **consume** this ABI.
+- Follow-up crates on this ABI (@cutils/pty, @cutils/keyring) must ship
+  zero-parameter `[Symbol.dispose]` (sync) or
+  `async [Symbol.asyncDispose](): Promise<void>` on native-handle-owning
+  classes from day one: scriptc's `using` requires the value declared with
+  the CLASS type — a Disposable-typed var fails SC2020.
