@@ -55,7 +55,7 @@ The `command()` spec is a plain record literal. A mapped type (`OptsFromOptions`
 - `options` accepts `boolean`/`string`/`number` with `short` (one character), `default` (must match `type`), and `description`. Every declared key is always present in `opts` — the `default`, else the type's zero value (`false`/`0`/`""`).
 - Parsing: `--opt`, `--opt=v`, `--opt v`, `-s`, `-s v`, `-sV`, clustered boolean shorts (`-ut3`), `--` end-of-options, `-h` (yields to a declared `short: "h"`).
 - Generated: `--help`/`-h` at program and command level, `--version`, unknown-command suggestions (edit distance ≤ 2 or prefix), labelled errors for missing arguments, unknown options, and bad values.
-- `schema` on an option or command accepts a Standard-Schema-shaped validator (`mySchema["~standard"]`); sync only — a `Promise` result is a clear error.
+- `schema` on an option or command accepts a bare validator, the `mySchema["~standard"]` props object, or a whole schema object carrying `"~standard"` (arktype `Type`, zod schema — unwrapped automatically, `"~standard".validate` preferred). When the schema declares `types.output`, `OptsFromOptions` uses it for `opts` — arktype literal unions infer as literal unions. Sync only — a `Promise` result is a clear error.
 - `run` returns the exit code and never exits itself: `process.exit(run({...}))`, or pass `argv` as a test seam.
 
 See the [package README](https://github.com/sigilco/cutils/tree/main/packages/cli#readme) for the full surface and the commander divergence table.

@@ -1,6 +1,7 @@
-// Standard-Schema seam tests: hand-rolled StandardValidator-shaped
-// validators (the shape `schema["~standard"]` has) run before the handler,
-// sync failures become errors, async validators are rejected cleanly.
+// Standard-Schema seam tests: bare validators, "~standard" props objects,
+// and whole schema objects (the arktype Type / zod shape) all run before
+// the handler; sync failures become errors, async validators are rejected
+// cleanly, and a schema with no validate path fails at construction.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { command, run } from "../dist/esm/index.js";
@@ -139,4 +140,69 @@ test("a real Standard-Schema-shaped validator object fits the interface", () => 
   assert.equal(ok.code, 0);
   assert.equal(bad.code, 1);
   assert.match(bad.err.join("\n"), /expected non-empty string/);
+});
+
+test("a whole schema object's ~standard props are unwrapped and called", () => {
+  // The arktype Type / zod schema shape: "~standard" carries validate +
+  // the phantom types channel, no top-level validate exists.
+  const whole = {
+    "~standard": {
+      validate: (value) =>
+        value === "ok" ? { value } : { issues: [{ message: "must be ok" }] },
+      types: { input: undefined, output: undefined },
+    },
+  };
+  const p = {
+    name: "d",
+    commands: {
+      c: command("c", {
+        options: { mode: { type: "string", schema: whole } },
+        handler: () => {},
+      }),
+    },
+  };
+  const ok = capture(() => run(p, ["c", "--mode", "ok"]));
+  const bad = capture(() => run(p, ["c", "--mode", "no"]));
+  assert.equal(ok.code, 0);
+  assert.equal(bad.code, 1);
+  assert.match(bad.err.join("\n"), /--mode: validation failed; must be ok/);
+});
+
+test("~standard.validate wins over a top-level validate when both exist", () => {
+  const both = {
+    validate: () => ({ issues: [{ message: "top-level should not run" }] }),
+    "~standard": {
+      validate: (value) => ({ value }),
+    },
+  };
+  const p = {
+    name: "d",
+    commands: {
+      c: command("c", {
+        options: { x: { type: "string", schema: both } },
+        handler: () => {},
+      }),
+    },
+  };
+  const r = capture(() => run(p, ["c", "--x", "anything"]));
+  assert.equal(r.code, 0);
+});
+
+test("a schema with neither validate nor ~standard.validate throws E_BAD_OPTION", () => {
+  assert.throws(
+    () =>
+      command("c", {
+        options: { x: { type: "string", schema: { types: {} } } },
+        handler: () => {},
+      }),
+    /E_BAD_OPTION: --x schema has neither ~standard\.validate nor validate/,
+  );
+  assert.throws(
+    () =>
+      command("c", {
+        schema: { "~standard": { types: {} } },
+        handler: () => {},
+      }),
+    /E_BAD_OPTION: command schema has neither ~standard\.validate nor validate/,
+  );
 });

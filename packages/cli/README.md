@@ -30,7 +30,7 @@ process.exit(
 - **The literal IS the schema.** Parse rules, `opts` types, `--help` tables, and error messages all come from the same `command()` spec — no runtime reflection (which scriptc cannot lower anyway).
 - **`opts` is fully inferred.** The options literal flows through a mapped type: `{ type: "boolean" }` → `boolean`, `"number"` → `number`, `"string"` → `string`. Every declared key is always present.
 - **Help, version, and errors are generated.** `--help`/`-h` at program and command level, `--version`, unknown-command suggestions, and labelled errors for missing arguments, unknown options, and bad values.
-- **Standard Schema hook.** Any validator shaped like `schema["~standard"]` can guard an option value or the whole `{ opts, args }` input — sync only (async validators are rejected with a clear error).
+- **Standard Schema hook.** Any validator shaped like `schema["~standard"]` — or a whole schema object carrying one, like an arktype `Type` or a zod schema — can guard an option value or the whole `{ opts, args }` input. When the schema declares `types.output`, that type flows into `opts` (arktype literal unions infer as literal unions). Sync only — async validators are rejected with a clear error.
 - **Exits by return code.** `run` prints and returns a number; it never calls `process.exit` itself, so it stays unit-testable under plain `node --test`.
 
 ## Surface
@@ -56,7 +56,7 @@ interface ProgramSpec {
 interface CommandSpec<O> {
   args?: string[];                       // required positionals, in order
   options?: O;                           // record of OptionSpec
-  schema?: StandardValidator;            // validates { opts, args }
+  schema?: StandardSchemaInput;          // validates { opts, args }
   handler: (opts: OptsFromOptions<O>, args: string[]) => void;
 }
 
@@ -65,8 +65,13 @@ interface OptionSpec {
   short?: string;                        // one character
   default?: unknown;                     // must match `type`; checked in command()
   description?: string;
-  schema?: StandardValidator;            // validates the parsed option value
+  schema?: StandardSchemaInput;          // validates the parsed option value
 }
+
+// StandardSchemaInput accepts three shapes: a bare { validate(value) },
+// the "~standard" props object itself, or a whole schema object carrying
+// "~standard" (arktype Type, zod schema). "~standard".validate wins when
+// both paths exist; neither → E_BAD_OPTION at command() time.
 ```
 
 ### Parsing rules
@@ -89,7 +94,9 @@ Every declared option key exists in `opts` with its declared type. When the flag
 
 ### Standard Schema seam
 
-`schema` accepts any object with `validate(value)` returning `{ value }` or `{ issues: [{ message }] }` — the shape `mySchema["~standard"]` has (pass that member, not the schema itself). Option schemas receive the parsed option value; command schemas receive `{ opts, args }`. Results are synchronous — a `Promise` return is an error, not a wait.
+`schema` accepts three shapes: a bare `{ validate(value) }` returning `{ value }` or `{ issues: [{ message }] }`; the `mySchema["~standard"]` props object itself; or a whole schema object carrying `"~standard"` — pass `myArktype` or `myZodSchema` directly and the builder unwraps it. `"~standard".validate` wins when both paths exist; a schema with neither fails at `command()` time with `E_BAD_OPTION`. Option schemas receive the parsed option value; command schemas receive `{ opts, args }`. Results are synchronous — a `Promise` return is an error, not a wait.
+
+When the schema declares `types.output` (every Standard Schema library does — it is the spec's phantom type channel), `OptsFromOptions` uses it for `opts` instead of the primitive `type`: `type("'dev' | 'prod'")` gives `opts.env: "dev" | "prod"`. A schema output of `unknown` falls back to the `type`-derived primitive.
 
 ## Divergences from commander
 

@@ -14,9 +14,11 @@
 //   - The handler crosses a dispatch boundary typed
 //     `(opts: unknown, args: string[]) => void`; the precise `opts` shape
 //     lives only in the user-facing command() generic.
-//   - The Standard Schema seam is a structural StandardValidator interface,
-//     NOT the official StandardSchemaV1 type — its computed "~standard" key
-//     poisons Object.entries lowering. Users pass `schema["~standard"]`.
+//   - The Standard Schema seam accepts a bare validator, the "~standard"
+//     props object, or a whole schema object (arktype Type, zod schema);
+//     command() unwraps to the callable validator. OptsFromOptions reads
+//     the schema's declared `types.output` so schema libraries drive `opts`
+//     inference through the spec's own type channel.
 
 // ---------------------------------------------------------------- public types
 
@@ -34,6 +36,25 @@ export interface StandardValidator {
   validate(value: unknown): StandardResult | Promise<StandardResult>;
 }
 
+// The props object at schema["~standard"] — what Standard Schema consumers
+// call. `types` is the spec's phantom in/out channel: libraries like arktype
+// and zod populate it, and OptsFromOptions reads `output` back out so the
+// schema's declared type flows into the handler's `opts`.
+export interface StandardValidatorProps {
+  validate(value: unknown): StandardResult | Promise<StandardResult>;
+  types?: { input?: unknown; output?: unknown };
+}
+
+// What OptionSpec.schema / CommandSpec.schema accept: a bare validator, the
+// "~standard" props object, or a whole schema object carrying one (an
+// arktype Type, a zod schema). All members optional so every shape fits;
+// command() throws E_BAD_OPTION when neither validate path exists.
+export interface StandardSchemaInput {
+  validate?(value: unknown): StandardResult | Promise<StandardResult>;
+  "~standard"?: StandardValidatorProps;
+  types?: { input?: unknown; output?: unknown };
+}
+
 export type OptionType = "boolean" | "string" | "number";
 
 // User-facing per-option spec. `default` is `unknown` at the type level
@@ -44,26 +65,58 @@ export interface OptionSpec {
   short?: string; // single character; "" / omitted = no short flag
   default?: unknown; // must match `type`; checked in command()
   description?: string;
-  schema?: StandardValidator; // validates the parsed option value
+  schema?: StandardSchemaInput; // validates the parsed option value
 }
 
-// Mapped type: the options literal drives the handler's `opts` shape.
-// Every declared key is present at runtime — boolean defaults to false,
-// number to 0, string to "" — so `opts` members are never optional.
+// Sentinel for "the schema declares no output type" — an object shape no
+// real schema output type is assignable to.
+export interface NoSchemaOutput {
+  readonly "~cli/noSchemaOutput": true;
+}
+
+// The output type a schema declares through Standard Schema's `types`
+// channel. Checks the whole-schema form first ("~standard".types.output),
+// then the props form (types.output directly — what schema["~standard"]
+// carries), then gives up.
+export type SchemaOutput<S> = S extends { "~standard": { types?: infer T } }
+  ? NonNullable<T> extends { output: infer O }
+    ? O
+    : NoSchemaOutput
+  : S extends { types?: infer T }
+    ? NonNullable<T> extends { output: infer O }
+      ? O
+      : NoSchemaOutput
+    : NoSchemaOutput;
+
+type PrimOption<O> = O extends { type: "boolean" }
+  ? boolean
+  : O extends { type: "number" }
+    ? number
+    : string;
+
+// Mapped type: the options literal drives the handler's `opts` shape. A
+// schema that declares `types.output` wins (arktype literal unions come
+// through here); otherwise the primitive `type` decides. Every declared
+// key is present at runtime — boolean defaults to false, number to 0,
+// string to "" — so `opts` members are never optional.
 export type OptsFromOptions<O> = {
-  [K in keyof O]: O[K] extends { type: "boolean" }
-    ? boolean
-    : O[K] extends { type: "number" }
-      ? number
-      : O[K] extends { type: "string" }
-        ? string
-        : unknown;
+  [K in keyof O]: O[K] extends { schema?: infer S }
+    ? [NonNullable<S>] extends [never]
+      ? PrimOption<O[K]>
+      : SchemaOutput<NonNullable<S>> extends infer T
+        ? [T] extends [NoSchemaOutput]
+          ? PrimOption<O[K]>
+          : [unknown] extends [T]
+            ? PrimOption<O[K]>
+            : T
+        : PrimOption<O[K]>
+    : PrimOption<O[K]>;
 };
 
 export interface CommandSpec<O extends Record<string, OptionSpec>> {
   args?: string[]; // required positional argument names, in order
   options?: O;
-  schema?: StandardValidator; // validates { opts, args } before the handler
+  schema?: StandardSchemaInput; // validates { opts, args } before the handler
   handler: (opts: OptsFromOptions<O>, args: string[]) => void;
 }
 
@@ -119,7 +172,7 @@ export function command<O extends Record<string, OptionSpec>>(
       hasDefault: hasDefault,
       defaultValue: hasDefault ? s.default : "",
       description: s.description === undefined ? "" : s.description,
-      schema: s.schema === undefined ? null : s.schema,
+      schema: normalizeSchema(s.schema, "--" + name),
     };
     if (def.short.length > 1) {
       throw new Error("E_BAD_OPTION: --" + name + " short must be a single character");
@@ -144,9 +197,28 @@ export function command<O extends Record<string, OptionSpec>>(
     description: description,
     args: spec.args === undefined ? [] : spec.args,
     options: options,
-    schema: spec.schema === undefined ? null : spec.schema,
+    schema: normalizeSchema(spec.schema, "command"),
     handler: h,
   };
+}
+
+// Unwrap a StandardSchemaInput to the callable validator: prefer the
+// "~standard" props (the spec's consumption path — an arktype Type or zod
+// schema carries no top-level validate), fall back to a bare validator.
+// Throws at construction when neither exists so a schema-less "schema"
+// can never silently pass.
+function normalizeSchema(input: StandardSchemaInput | undefined, label: string): StandardValidator | null {
+  if (input === undefined) {
+    return null;
+  }
+  const std = input["~standard"];
+  if (std !== undefined && std.validate !== undefined) {
+    return std;
+  }
+  if (input.validate !== undefined) {
+    return input as StandardValidator;
+  }
+  throw new Error("E_BAD_OPTION: " + label + " schema has neither ~standard.validate nor validate");
 }
 
 // ---------------------------------------------------------------- run()

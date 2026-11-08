@@ -43,8 +43,15 @@ Record<string, OptionSpec>>` lowers fully — the generic only feeds the
   runtime-checks the default against `type` at construction (`E_BAD_OPTION`).
 - **The schema seam is structural, not StandardSchemaV1**: the official
   type's computed `"~standard"` key poisons `Object.entries` lowering.
-  `StandardValidator`/`StandardResult` are hand-rolled structural twins —
-  users pass `mySchema["~standard"]`. Keep it that way.
+  `StandardValidator`/`StandardResult`/`StandardSchemaInput` are
+  hand-rolled structural twins — `schema` accepts a bare validator, the
+  `"~standard"` props, or a whole schema object (arktype `Type`, zod);
+  `normalizeSchema` prefers `"~standard".validate` and throws
+  `E_BAD_OPTION` when neither path exists. `OptsFromOptions` reads the
+  schema's `types.output` (Standard Schema's phantom channel) before
+  falling back to the primitive `type` — verified 2026-11-08: arktype
+  `type("'dev'|'prod'")` infers `opts.env: "dev" | "prod"` and validates
+  under scriptc Node islands end-to-end.
 - **`opts` keys are always present**: absent flag → `default` else the
   type's zero value (`false`/`0`/`""`). Documented because it differs
   from commander (`undefined`). "Was it passed" = sentinel default or
