@@ -3,12 +3,18 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.6.0
+
+### Features
+
+- **@cutils/cli:** Initial release: Standard-Schema-first declarative CLI builder (`command`/`run` + `str`/`num`/`int`/`bool` builtins) — `opts` types derive entirely from the schema's `types.output` channel; validators own all coercion and errors; compiles statically into the app ELF.
+<!-- release:end -->
+
 ## 0.5.0
 
 ### Features
 
 - **@cutils/ffi:** Initial release: shared scriptc ffi_format 7 span ABI (same as @cutils/sqlite) with layout/buffer helpers and a Rust EchoPoint echo used as the ELF smoke.
-<!-- release:end -->
 
 ## 0.4.0
 
