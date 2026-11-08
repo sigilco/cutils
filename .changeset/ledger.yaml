@@ -18,6 +18,10 @@
   dir: packages/cache
   intents:
     - slow-olives-trade
+"@cutils/cli@0.6.0":
+  dir: packages/cli
+  intents:
+    - cli-initial-release
 "@cutils/ffi@0.5.0":
   dir: packages/ffi
   intents:
