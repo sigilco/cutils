@@ -207,7 +207,10 @@ export function command<O extends Record<string, OptionSpec>>(
 // schema carries no top-level validate), fall back to a bare validator.
 // Throws at construction when neither exists so a schema-less "schema"
 // can never silently pass.
-function normalizeSchema(input: StandardSchemaInput | undefined, label: string): StandardValidator | null {
+function normalizeSchema(
+  input: StandardSchemaInput | undefined,
+  label: string,
+): StandardValidator | null {
   if (input === undefined) {
     return null;
   }

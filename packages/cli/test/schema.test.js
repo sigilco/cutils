@@ -147,8 +147,7 @@ test("a whole schema object's ~standard props are unwrapped and called", () => {
   // the phantom types channel, no top-level validate exists.
   const whole = {
     "~standard": {
-      validate: (value) =>
-        value === "ok" ? { value } : { issues: [{ message: "must be ok" }] },
+      validate: (value) => (value === "ok" ? { value } : { issues: [{ message: "must be ok" }] }),
       types: { input: undefined, output: undefined },
     },
   };
