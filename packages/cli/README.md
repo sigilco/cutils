@@ -1,9 +1,11 @@
 # @cutils/cli
 
-Type-first, declarative CLI builder authored inside the [scriptc](https://github.com/vercel-labs/scriptc) compilable subset — the command spec is a plain record literal, a mapped type carries the options into your handler, and `scriptc build` lowers the whole thing into the app's single static ELF. Zero dependencies; runs under Node unchanged.
+Declarative CLI builder authored inside the [scriptc](https://github.com/vercel-labs/scriptc) compilable subset — the command spec is a plain record literal, and `scriptc build` lowers the whole thing into the app's single static ELF. Zero dependencies; runs under Node unchanged.
+
+The library owns exactly one thing — the **seam**: argv tokenize → flag-vs-value → effective value → the [Standard Schema](https://standardschema.dev) `validate` boundary → `{opts, args}` → dispatch, help, errors, exit code. Every value semantic — coercion, constraints, literal unions, morphs — belongs to the schema you bring (zod, arktype, valibot, or a hand-rolled `{validate}`). `opts` typing derives entirely from Standard Schema's `types.output` phantom channel; an option without a schema is a raw string, which is just the truth about argv.
 
 ```ts
-import { command, run } from "@cutils/cli";
+import { bool, command, int, run, str } from "@cutils/cli";
 
 process.exit(
   run({
@@ -13,13 +15,14 @@ process.exit(
       greet: command("greet someone", {
         args: ["name"],
         options: {
-          upper: { type: "boolean", short: "u", description: "uppercase output" },
-          times: { type: "number", short: "t", default: 1, description: "repeat n times" },
+          upper: bool({ short: "u", description: "uppercase output" }),
+          times: int({ short: "t", default: 1, max: 10, description: "repeat n times" }),
+          greeting: str({ short: "g", description: "greeting word" }),
         },
         handler: (opts, args) => {
-          // opts: { upper: boolean; times: number } — fully inferred
+          // opts: { upper: boolean; times: number; greeting: string } — fully inferred
           const who = opts.upper ? args[0].toUpperCase() : args[0];
-          for (let i = 0; i < opts.times; i++) console.log(`hello ${who}`);
+          for (let i = 0; i < opts.times; i++) console.log(`${opts.greeting || "hello"} ${who}`);
         },
       }),
     },
@@ -27,20 +30,24 @@ process.exit(
 );
 ```
 
-- **The literal IS the schema.** Parse rules, `opts` types, `--help` tables, and error messages all come from the same `command()` spec — no runtime reflection (which scriptc cannot lower anyway).
-- **`opts` is fully inferred.** The options literal flows through a mapped type: `{ type: "boolean" }` → `boolean`, `"number"` → `number`, `"string"` → `string`. Every declared key is always present.
-- **Help, version, and errors are generated.** `--help`/`-h` at program and command level, `--version`, unknown-command suggestions, and labelled errors for missing arguments, unknown options, and bad values.
-- **Standard Schema hook.** Any validator shaped like `schema["~standard"]` — or a whole schema object carrying one, like an arktype `Type` or a zod schema — can guard an option value or the whole `{ opts, args }` input. When the schema declares `types.output`, that type flows into `opts` (arktype literal unions infer as literal unions). Sync only — async validators are rejected with a clear error.
+- **No `type` field.** `flag` is the only parse fact the library owns; everything else is schema. `opts` types come 100% from `types.output` — bring arktype/zod and literal unions, branded types, morphs all flow through.
+- **Schemas everywhere or nowhere.** `schema` is optional per option and accepts four shapes: a bare `{validate}`, a `(v) => result` function, the `mySchema["~standard"]` props object, or a whole schema object (an arktype `Type`, a zod schema). A bare schema object also works _as_ the option entry itself.
+- **Validated output is what `opts` gets.** Validators receive the raw argv string and return the parsed value — morphs apply to explicit values _and_ to `default`s, which are run through `validate()` at `command()` time.
+- **Zero-dep primitives built in.** `str()`, `num()`, `int()`, `bool()` are tiny Standard-Schema-shaped validators with the `types` phantom declared — `num({min:0, max:99})` infers `opts.x: number` and validates, no library required.
 - **Exits by return code.** `run` prints and returns a number; it never calls `process.exit` itself, so it stays unit-testable under plain `node --test`.
 
 ## Surface
 
 ```ts
 declare function run(prog: ProgramSpec, argv?: string[]): number;
-declare function command<O extends Record<string, OptionSpec>>(
+declare function command<O extends Record<string, OptionInput>>(
   description: string,
   spec: CommandSpec<O>,
 ): CommandDef;
+declare function str(extra?: BuiltinOpts): OptionSpec & { schema: TypedValidator<string> };
+declare function num(extra?: NumOpts): OptionSpec & { schema: TypedValidator<number> };
+declare function int(extra?: NumOpts): OptionSpec & { schema: TypedValidator<number> };
+declare function bool(extra?: BuiltinOpts): OptionSpec & { flag: true; schema: TypedValidator<boolean> };
 ```
 
 `run(prog)` reads `process.argv.slice(2)`; pass `argv` explicitly as a test seam or to embed a sub-CLI.
@@ -55,34 +62,35 @@ interface ProgramSpec {
 
 interface CommandSpec<O> {
   args?: string[];                       // required positionals, in order
-  options?: O;                           // record of OptionSpec
-  schema?: StandardSchemaInput;          // validates { opts, args }
+  options?: O;                           // record of OptionSpec | schema | function
+  schema?: SchemaInput;                  // validates { opts, args }
   handler: (opts: OptsFromOptions<O>, args: string[]) => void;
 }
 
 interface OptionSpec {
-  type: "boolean" | "string" | "number";
+  schema?: SchemaInput;                  // absent = raw string passthrough
+  flag?: boolean;                        // consumes no value: --x / --x=false / -x
   short?: string;                        // one character
-  default?: unknown;                     // must match `type`; checked in command()
+  default?: unknown;                     // run through validate() in command()
   description?: string;
-  schema?: StandardSchemaInput;          // validates the parsed option value
+  metavar?: string;                      // help hint: --name <metavar>; defaults to the name
 }
 
-// StandardSchemaInput accepts three shapes: a bare { validate(value) },
-// the "~standard" props object itself, or a whole schema object carrying
-// "~standard" (arktype Type, zod schema). "~standard".validate wins when
-// both paths exist; neither → E_BAD_OPTION at command() time.
+// SchemaInput = StandardSchemaInput | ValidateFn — a bare validator, the
+// "~standard" props object, a whole schema object, or a (v) => result fn.
+// OptsFromOptions reads types.output: bare schema → declared output;
+// { schema } → declared output (or unknown); { flag } → boolean; else → string.
 ```
 
 ### Parsing rules
 
 | Input                         | Result                                        |
 | ----------------------------- | --------------------------------------------- |
-| `--upper`                     | boolean `true`                                |
-| `--times 3`, `--times=3`      | number `3`; non-numeric → error               |
-| `-u`, `-t 3`, `-t3`, `-ut3`   | short flags; boolean shorts cluster           |
+| `--upper`                     | flag `true`                                   |
+| `--upper=false` / `=0` / `=1` | flag value through the validator → `false`    |
+| `--times 3`, `--times=3`      | raw `"3"` → validator's output (e.g. `3`)     |
+| `-u`, `-t 3`, `-t3`, `-ut3`   | short flags; flag shorts cluster              |
 | `--greeting hi`, `-g hi`      | string option                                 |
-| `--upper=false` / `=0` / `=1` | explicit boolean value                        |
 | `--`                          | end of options; rest are positionals          |
 | `-h`                          | command help unless `h` is a declared `short` |
 
@@ -90,25 +98,45 @@ Option values may appear anywhere before `--`. Declared positionals are all requ
 
 ### Defaults and `opts` presence
 
-Every declared option key exists in `opts` with its declared type. When the flag is absent: the `default` if one was declared, else the type's zero value (`false`, `0`, `""`). There is no `undefined` member to check — use a sentinel `default` or a `schema` if "was it passed" matters.
+Every declared option key exists in `opts`. When the flag is absent: the `default` if one was declared (already validated and morphed at `command()` time), else `false` for flags / `""` for value-options. A schema on a value-option therefore sees `""` for absent input — a schema that rejects `""` makes its option effectively required; declare a `default` to keep it optional. Schema-less options check `default` cheaply (flag → boolean, else → string).
 
-### Standard Schema seam
+### Custom validators
 
-`schema` accepts three shapes: a bare `{ validate(value) }` returning `{ value }` or `{ issues: [{ message }] }`; the `mySchema["~standard"]` props object itself; or a whole schema object carrying `"~standard"` — pass `myArktype` or `myZodSchema` directly and the builder unwraps it. `"~standard".validate` wins when both paths exist; a schema with neither fails at `command()` time with `E_BAD_OPTION`. Option schemas receive the parsed option value; command schemas receive `{ opts, args }`. Results are synchronous — a `Promise` return is an error, not a wait.
+The seam is one interface:
 
-When the schema declares `types.output` (every Standard Schema library does — it is the spec's phantom type channel), `OptsFromOptions` uses it for `opts` instead of the primitive `type`: `type("'dev' | 'prod'")` gives `opts.env: "dev" | "prod"`. A schema output of `unknown` falls back to the `type`-derived primitive.
+```ts
+interface CliValidator<I, O> {           // i.e. StandardValidator
+  validate(value: unknown): StandardResult | Promise<StandardResult>;
+  types?: { input?: I; output?: O };     // phantom — never read at runtime
+}
+```
+
+Declare `types.output` on a hand-rolled validator and `opts` picks it up — no library needed:
+
+```ts
+const port: TypedValidator<number> = {
+  validate: (v) => {
+    const n = Number(v);
+    return Number.isNaN(n) ? { issues: [{ message: `expected a number` }] } : { value: n };
+  },
+  types: { output: 0 },
+};
+options: { port: { schema: port } }  // opts.port: number
+```
+
+Async validators are rejected with a clear error — `Promise` results are never awaited.
 
 ## Divergences from commander
 
 | commander                                 | @cutils/cli                                                 | Why                                               |
 | ----------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------- |
 | `.option()` / `.argument()` chaining      | one `command()` literal                                     | declarative spec = the static schema; no mutation |
-| `opts` untyped (`OptionValues`)           | `opts` inferred from the literal via mapped type            | the literal is the type                           |
+| `opts` untyped (`OptionValues`)           | `opts` inferred from schemas via `types.output`             | the schema carries the type                       |
 | absent option is `undefined`              | zero value or declared `default`                            | no `\| undefined` unions in the subset            |
 | variadic args, `[optional]` positionals   | required positionals only                                   | v0 scope; variadic is a v1 item                   |
 | `process.exit` inside the framework       | `run` returns the code; caller exits                        | testable under `node --test`, no hidden exits     |
 | async/`.action()` promise handlers        | sync handlers only                                          | `void \| Promise<void>` unions add dynamic slots  |
-| zod etc. via `.parse` wrappers            | `schema:` Standard-Validator hook                           | async validators rejected; heavy schema libs stay |
+| zod etc. via `.parse` wrappers            | `schema:` Standard-Schema seam                              | async validators rejected; heavy schema libs stay |
 |                                           |                                                             | Node-mode under scriptc's island limits           |
 | automatic `-V` / help option registration | `-h`/`--help`/`--version` only, `-h` yields to `short: "h"` | small fixed set; user shorts win                  |
 | subcommand trees                          | flat command map                                            | v2 item                                           |

@@ -70,6 +70,6 @@ expect_err 1 "expected a number, got 'abc'" greet --times abc x
 expect_err 1 "unknown option '--bogus'" greet --bogus x
 expect_err 1 "did you mean 'greet'?" gret x
 expect_err 1 "unexpected argument" greet a b
-expect_err 1 "times must be <= 10" greet --times 99 x
+expect_err 1 "expected an integer <= 10, got 99" greet --times 99 x
 
 echo "elf-cli-smoke OK"

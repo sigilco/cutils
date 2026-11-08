@@ -1,7 +1,7 @@
 // Help and version output tests for @cutils/cli.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { command, run } from "../dist/esm/index.js";
+import { bool, command, num, run, str } from "../dist/esm/index.js";
 import { capture } from "./helpers.js";
 
 function prog() {
@@ -13,8 +13,8 @@ function prog() {
       greet: command("greet someone", {
         args: ["name"],
         options: {
-          upper: { type: "boolean", short: "u", description: "uppercase output" },
-          times: { type: "number", short: "t", default: 1, description: "repeat n times" },
+          upper: bool({ short: "u", description: "uppercase output" }),
+          times: num({ short: "t", default: 1, description: "repeat n times" }),
         },
         handler: () => {},
       }),
@@ -85,7 +85,7 @@ test("-h resolves to a user-declared short option first", () => {
     name: "demo",
     commands: {
       c: command("c", {
-        options: { host: { type: "string", short: "h" } },
+        options: { host: str({ short: "h" }) },
         handler: (opts) => {
           seen = opts;
         },

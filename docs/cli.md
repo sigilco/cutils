@@ -1,6 +1,6 @@
 # @cutils/cli
 
-Type-first, declarative CLI builder in the scriptc-compilable subset — the same source runs under Node and lowers into a native ELF. Zero dependencies.
+Declarative CLI builder in the scriptc-compilable subset — the same source runs under Node and lowers into a native ELF. Zero dependencies. It owns the seam only: argv → validated values → dispatch; all value semantics (coercion, constraints, morphs) belong to the [Standard Schema](https://standardschema.dev) you plug in.
 
 ## Quickstart
 
@@ -13,7 +13,7 @@ pnpm add @cutils/cli
 ```
 
 ```ts
-import { command, run } from "@cutils/cli";
+import { bool, command, int, run, str } from "@cutils/cli";
 
 process.exit(
   run({
@@ -23,13 +23,14 @@ process.exit(
       greet: command("greet someone", {
         args: ["name"],
         options: {
-          upper: { type: "boolean", short: "u", description: "uppercase output" },
-          times: { type: "number", short: "t", default: 1, description: "repeat n times" },
+          upper: bool({ short: "u", description: "uppercase output" }),
+          times: int({ short: "t", default: 1, max: 10, description: "repeat n times" }),
+          greeting: str({ short: "g", description: "greeting word" }),
         },
         handler: (opts, args) => {
-          // opts: { upper: boolean; times: number } — fully inferred
+          // opts: { upper: boolean; times: number; greeting: string } — fully inferred
           const who = opts.upper ? args[0].toUpperCase() : args[0];
-          for (let i = 0; i < opts.times; i++) console.log(`hello ${who}`);
+          for (let i = 0; i < opts.times; i++) console.log(`${opts.greeting || "hello"} ${who}`);
         },
       }),
     },
@@ -49,13 +50,16 @@ scriptc build src/main.ts -o demo
 
 ## How it works
 
-The `command()` spec is a plain record literal. A mapped type (`OptsFromOptions`) carries the options literal into the handler's `opts` parameter, so parse rules, types, `--help` output, and error messages all come from one static schema — no runtime reflection anywhere.
+The `command()` spec is a plain record literal. `OptsFromOptions` maps each options entry into the handler's `opts` parameter through Standard Schema's `types.output` channel — parse rules, types, `--help` output, and error messages all come from one static schema, no runtime reflection.
 
 - `args` names required positionals, in order. Extra positionals are an `unexpected argument` error.
-- `options` accepts `boolean`/`string`/`number` with `short` (one character), `default` (must match `type`), and `description`. Every declared key is always present in `opts` — the `default`, else the type's zero value (`false`/`0`/`""`).
-- Parsing: `--opt`, `--opt=v`, `--opt v`, `-s`, `-s v`, `-sV`, clustered boolean shorts (`-ut3`), `--` end-of-options, `-h` (yields to a declared `short: "h"`).
-- Generated: `--help`/`-h` at program and command level, `--version`, unknown-command suggestions (edit distance ≤ 2 or prefix), labelled errors for missing arguments, unknown options, and bad values.
-- `schema` on an option or command accepts a bare validator, the `mySchema["~standard"]` props object, or a whole schema object carrying `"~standard"` (arktype `Type`, zod schema — unwrapped automatically, `"~standard".validate` preferred). When the schema declares `types.output`, `OptsFromOptions` uses it for `opts` — arktype literal unions infer as literal unions. Sync only — a `Promise` result is a clear error.
+- `options` entries are `OptionSpec`, a whole schema object, or a bare `(v) => result` function — discriminated by `~standard`/`validate` presence (or `typeof === "function"`).
+- `OptionSpec` has no `type`: `flag` (consumes no value) is the only parse fact; `schema` adds validation + typing; `short`, `default` (validated through `validate()` at `command()`), `description`, `metavar` (help hint, defaults to the name).
+- Validators receive the raw argv string; the returned `value` is what `opts` gets — morphs apply to explicit values and defaults. Absent options: `default`, else `false` for flags / `""` for value-options — a schema that rejects `""` is effectively required.
+- `str()`/`num()`/`int()`/`bool()` builtins are zero-dep Standard-Schema-shaped validators with `types.output` declared — `num({min, max})` both infers `opts.x: number` and enforces bounds.
+- Foreign schemas plug straight in: `schema: myZod`, `schema: myArktype`, `schema: mySchema["~standard"]`, or drop a whole schema object in as the option entry itself. Async validators are rejected cleanly.
+- Parsing: `--opt`, `--opt=v`, `--opt v`, `-s`, `-s v`, `-sV`, clustered flag shorts (`-ut3`), `--flag=false`, `--` end-of-options, `-h` (yields to a declared `short: "h"`).
+- Generated: `--help`/`-h` at program and command level, `--version`, unknown-command suggestions, labelled errors.
 - `run` returns the exit code and never exits itself: `process.exit(run({...}))`, or pass `argv` as a test seam.
 
 See the [package README](https://github.com/sigilco/cutils/tree/main/packages/cli#readme) for the full surface and the commander divergence table.

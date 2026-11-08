@@ -1,24 +1,26 @@
-// @cutils/cli — type-first, declarative CLI builder in the scriptc
-// compilable subset. The command spec is a plain record literal; a mapped
-// type carries the options literal into the handler's `opts` parameter, so
-// parse + validate + help all come from one static schema — no runtime
-// reflection anywhere (reflection has no static lowering).
+// @cutils/cli — declarative CLI builder in the scriptc compilable subset.
+// Single-responsibility: argv tokenize → flag-vs-value → effective value →
+// the Standard Schema `validate` boundary → {opts, args} → dispatch. All
+// value semantics (coercion, constraints, literal unions, morphs) belong to
+// the schema — we transport raw argv strings, validators interpret them.
+// `opts` typing derives entirely from Standard Schema's `types.output`
+// phantom channel; no schema → the option is a string (the argv truth).
 //
 // Subset notes (see AGENTS.md for the full rulebook):
 //   - No dynamic record READS (obj[key] is SC1090). All lookups walk
 //     Object.entries() with indexed loops. Dynamic record WRITES (the
 //     `values[name] = v` below) are fine.
 //   - `| null` unions only; absent optional record members read as
-//     `undefined` and are tested with `=== undefined` (the cache pattern).
+//     `undefined` and are tested with `=== undefined`.
 //   - No classes, no `?.`/`??`, no spread, no shorthand methods.
 //   - The handler crosses a dispatch boundary typed
 //     `(opts: unknown, args: string[]) => void`; the precise `opts` shape
 //     lives only in the user-facing command() generic.
 //   - The Standard Schema seam accepts a bare validator, the "~standard"
-//     props object, or a whole schema object (arktype Type, zod schema);
-//     command() unwraps to the callable validator. OptsFromOptions reads
-//     the schema's declared `types.output` so schema libraries drive `opts`
-//     inference through the spec's own type channel.
+//     props object, a whole schema object (arktype Type, zod schema), or a
+//     bare `(v) => result` function; command() unwraps to the callable
+//     validator. OptsFromOptions reads `types.output` so schema libraries
+//     drive `opts` inference through the spec's own type channel.
 
 // ---------------------------------------------------------------- public types
 
@@ -32,40 +34,77 @@ export interface StandardResult {
   issues?: readonly ValidationIssue[] | null;
 }
 
+// A bare validator object — the shape hand-rolled and foreign validators
+// share. `types` is Standard Schema's phantom input/output channel: it is
+// never read at runtime, but OptsFromOptions maps `output` into `opts`, so
+// declaring it on a custom validator types the option with zero machinery.
 export interface StandardValidator {
   validate(value: unknown): StandardResult | Promise<StandardResult>;
+  types?: { input?: unknown; output?: unknown };
 }
 
 // The props object at schema["~standard"] — what Standard Schema consumers
-// call. `types` is the spec's phantom in/out channel: libraries like arktype
-// and zod populate it, and OptsFromOptions reads `output` back out so the
-// schema's declared type flows into the handler's `opts`.
+// call.
 export interface StandardValidatorProps {
   validate(value: unknown): StandardResult | Promise<StandardResult>;
   types?: { input?: unknown; output?: unknown };
 }
 
+// A bare `(v) => result` function — the minimal validation boundary. It has
+// no type channel, so the option's `opts` member is `unknown`.
+export type ValidateFn = (value: unknown) => StandardResult | Promise<StandardResult>;
+
 // What OptionSpec.schema / CommandSpec.schema accept: a bare validator, the
-// "~standard" props object, or a whole schema object carrying one (an
-// arktype Type, a zod schema). All members optional so every shape fits;
-// command() throws E_BAD_OPTION when neither validate path exists.
+// "~standard" props object, a whole schema object carrying one (an arktype
+// Type, a zod schema), or a bare function. All members optional so every
+// object shape fits; command() throws E_BAD_OPTION when no validate path
+// exists.
 export interface StandardSchemaInput {
   validate?(value: unknown): StandardResult | Promise<StandardResult>;
   "~standard"?: StandardValidatorProps;
   types?: { input?: unknown; output?: unknown };
 }
 
-export type OptionType = "boolean" | "string" | "number";
+export type SchemaInput = StandardSchemaInput | ValidateFn;
 
-// User-facing per-option spec. `default` is `unknown` at the type level
-// (multi-type unions in record members are subset-fragile); command()
-// checks at construction that a provided default matches `type`.
+// User-facing per-option spec. There is no `type` field: flag-vs-value is
+// the only parse fact the library needs (`flag`), and everything else —
+// coercion, constraints, the `opts` type — comes from the schema.
 export interface OptionSpec {
-  type: OptionType;
+  schema?: SchemaInput; // absent = raw string passthrough (the argv truth)
+  flag?: boolean; // true = consumes no value; --x / --x=false / -x
   short?: string; // single character; "" / omitted = no short flag
-  default?: unknown; // must match `type`; checked in command()
+  default?: unknown; // the value opts receives when absent; run through validate() in command()
   description?: string;
-  schema?: StandardSchemaInput; // validates the parsed option value
+  metavar?: string; // help hint shown as `--name <metavar>`; defaults to the option name
+}
+
+// One options-record member: a spec, a whole schema object, or a bare
+// validate function. command() discriminates: "~standard" or "validate"
+// present (or the entry is a function) → schema; otherwise OptionSpec.
+export type OptionInput = OptionSpec | StandardSchemaInput | ValidateFn;
+
+// A validator whose declared output type is visible to OptsFromOptions —
+// the shape the builtins return. `types` stays phantom; only the declared
+// type is annotated, no runtime `types` member is emitted. `output` is a
+// REQUIRED member of the phantom (matching the Standard Schema spec) —
+// SchemaOutput's `{output: infer O}` pattern never matches an optional one.
+export interface TypedValidator<O> {
+  validate(value: unknown): StandardResult;
+  types?: { input?: unknown; output: O };
+}
+
+// Shared extras every builtin factory accepts and merges.
+export interface BuiltinOpts {
+  short?: string;
+  default?: unknown;
+  description?: string;
+  metavar?: string;
+}
+
+export interface NumOpts extends BuiltinOpts {
+  min?: number; // inclusive lower bound
+  max?: number; // inclusive upper bound
 }
 
 // Sentinel for "the schema declares no output type" — an object shape no
@@ -76,8 +115,7 @@ export interface NoSchemaOutput {
 
 // The output type a schema declares through Standard Schema's `types`
 // channel. Checks the whole-schema form first ("~standard".types.output),
-// then the props form (types.output directly — what schema["~standard"]
-// carries), then gives up.
+// then the props/bare-validator form (types.output directly), then gives up.
 export type SchemaOutput<S> = S extends { "~standard": { types?: infer T } }
   ? NonNullable<T> extends { output: infer O }
     ? O
@@ -88,46 +126,52 @@ export type SchemaOutput<S> = S extends { "~standard": { types?: infer T } }
       : NoSchemaOutput
     : NoSchemaOutput;
 
-type PrimOption<O> = O extends { type: "boolean" }
-  ? boolean
-  : O extends { type: "number" }
-    ? number
-    : string;
+type FlagOrString<O> = O extends { flag: true } ? boolean : string;
 
-// Mapped type: the options literal drives the handler's `opts` shape. A
-// schema that declares `types.output` wins (arktype literal unions come
-// through here); otherwise the primitive `type` decides. Every declared
-// key is present at runtime — boolean defaults to false, number to 0,
-// string to "" — so `opts` members are never optional.
-export type OptsFromOptions<O> = {
-  [K in keyof O]: O[K] extends { schema?: infer S }
-    ? [NonNullable<S>] extends [never]
-      ? PrimOption<O[K]>
-      : SchemaOutput<NonNullable<S>> extends infer T
-        ? [T] extends [NoSchemaOutput]
-          ? PrimOption<O[K]>
-          : [unknown] extends [T]
-            ? PrimOption<O[K]>
-            : T
-        : PrimOption<O[K]>
-    : PrimOption<O[K]>;
+// Mapped type: the options literal drives the handler's `opts` shape, and
+// the Standard Schema `types.output` channel is the ONLY type source:
+//   bare schema entry      → its declared output
+//   { schema: S }          → S's declared output; no output → unknown
+//   { flag: true } (bare)  → boolean
+//   everything else        → string — absent a schema, argv IS strings
+// Every declared key is present at runtime — absent options take the
+// default, else flag → false, else "" — so members are never optional.
+export type OptsFromOptions<O extends Record<string, OptionInput>> = {
+  [K in keyof O]: O[K] extends { "~standard": unknown }
+    ? SchemaOutput<O[K]>
+    : O[K] extends { validate: unknown }
+      ? SchemaOutput<O[K]>
+      : O[K] extends ValidateFn
+        ? unknown
+        : O[K] extends { schema?: infer S }
+          ? [NonNullable<S>] extends [never]
+            ? FlagOrString<O[K]>
+            : SchemaOutput<NonNullable<S>> extends infer T
+              ? [T] extends [NoSchemaOutput]
+                ? unknown
+                : [unknown] extends [T]
+                  ? unknown
+                  : T
+              : unknown
+          : FlagOrString<O[K]>;
 };
 
-export interface CommandSpec<O extends Record<string, OptionSpec>> {
+export interface CommandSpec<O extends Record<string, OptionInput>> {
   args?: string[]; // required positional argument names, in order
   options?: O;
-  schema?: StandardSchemaInput; // validates { opts, args } before the handler
+  schema?: SchemaInput; // validates { opts, args } before the handler
   handler: (opts: OptsFromOptions<O>, args: string[]) => void;
 }
 
 // Normalized internal option shape: concrete fields, no optional members,
 // so the parse loop never branches on member presence.
 export interface OptionDef {
-  type: string; // "boolean" | "string" | "number"
+  flag: boolean; // consumes no value
   short: string; // "" = none
   hasDefault: boolean;
   defaultValue: unknown;
   description: string; // "" = none
+  metavar: string; // "" = fall back to the option name in help
   schema: StandardValidator | null;
 }
 
@@ -152,39 +196,202 @@ export interface ParsedInput {
   args: string[];
 }
 
+// ---------------------------------------------------------------- builtins
+
+// Zero-dependency primitives as Standard-Schema-shaped validators. Each
+// factory returns an OptionSpec carrying a TypedValidator, so `opts`
+// inference works without any schema library installed. Extra OptionSpec
+// fields in `extra` (and metavar overrides) merge over the defaults.
+
+export function str(extra?: BuiltinOpts): OptionSpec & { schema: TypedValidator<string> } {
+  const v: TypedValidator<string> = {
+    validate: (value: unknown): StandardResult => {
+      if (typeof value === "string") {
+        return { value: value };
+      }
+      return { issues: [{ message: "expected a string" }] };
+    },
+  };
+  const spec: OptionSpec = { schema: v, metavar: "str" };
+  return mergeExtra(spec, extra) as OptionSpec & { schema: TypedValidator<string> };
+}
+
+export function num(extra?: NumOpts): OptionSpec & { schema: TypedValidator<number> } {
+  const lo = extra !== undefined && extra.min !== undefined ? extra.min : null;
+  const hi = extra !== undefined && extra.max !== undefined ? extra.max : null;
+  const v: TypedValidator<number> = {
+    validate: (value: unknown): StandardResult => {
+      const n = typeof value === "number" ? value : Number(value);
+      if (Number.isNaN(n)) {
+        return { issues: [{ message: "expected a number, got '" + String(value) + "'" }] };
+      }
+      if (lo !== null && n < lo) {
+        return {
+          issues: [{ message: "expected a number >= " + String(lo) + ", got " + String(n) }],
+        };
+      }
+      if (hi !== null && n > hi) {
+        return {
+          issues: [{ message: "expected a number <= " + String(hi) + ", got " + String(n) }],
+        };
+      }
+      return { value: n };
+    },
+  };
+  const spec: OptionSpec = { schema: v, metavar: "n" };
+  return mergeExtra(spec, extra) as OptionSpec & { schema: TypedValidator<number> };
+}
+
+export function int(extra?: NumOpts): OptionSpec & { schema: TypedValidator<number> } {
+  const lo = extra !== undefined && extra.min !== undefined ? extra.min : null;
+  const hi = extra !== undefined && extra.max !== undefined ? extra.max : null;
+  const v: TypedValidator<number> = {
+    validate: (value: unknown): StandardResult => {
+      const n = typeof value === "number" ? value : Number(value);
+      if (Number.isNaN(n)) {
+        return { issues: [{ message: "expected a number, got '" + String(value) + "'" }] };
+      }
+      if (!Number.isInteger(n)) {
+        return { issues: [{ message: "expected an integer, got " + String(n) }] };
+      }
+      if (lo !== null && n < lo) {
+        return {
+          issues: [{ message: "expected an integer >= " + String(lo) + ", got " + String(n) }],
+        };
+      }
+      if (hi !== null && n > hi) {
+        return {
+          issues: [{ message: "expected an integer <= " + String(hi) + ", got " + String(n) }],
+        };
+      }
+      return { value: n };
+    },
+  };
+  const spec: OptionSpec = { schema: v, metavar: "int" };
+  return mergeExtra(spec, extra) as OptionSpec & { schema: TypedValidator<number> };
+}
+
+export function bool(
+  extra?: BuiltinOpts,
+): OptionSpec & { flag: true; schema: TypedValidator<boolean> } {
+  const v: TypedValidator<boolean> = {
+    validate: (value: unknown): StandardResult => {
+      if (value === true || value === "true" || value === "1") {
+        return { value: true };
+      }
+      if (value === false || value === "false" || value === "0") {
+        return { value: false };
+      }
+      return { issues: [{ message: "expected a boolean, got '" + String(value) + "'" }] };
+    },
+  };
+  const spec: OptionSpec = { flag: true, schema: v };
+  return mergeExtra(spec, extra) as OptionSpec & { flag: true; schema: TypedValidator<boolean> };
+}
+
+function mergeExtra(spec: OptionSpec, extra?: BuiltinOpts): OptionSpec {
+  const out: OptionSpec = {};
+  if (spec.schema !== undefined) {
+    out.schema = spec.schema;
+  }
+  if (spec.flag !== undefined) {
+    out.flag = spec.flag;
+  }
+  if (spec.metavar !== undefined) {
+    out.metavar = spec.metavar;
+  }
+  if (extra === undefined) {
+    return out;
+  }
+  if (extra.short !== undefined) {
+    out.short = extra.short;
+  }
+  if (extra.default !== undefined) {
+    out.default = extra.default;
+  }
+  if (extra.description !== undefined) {
+    out.description = extra.description;
+  }
+  if (extra.metavar !== undefined) {
+    out.metavar = extra.metavar;
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- command()
 
-export function command<O extends Record<string, OptionSpec>>(
+export function command<O extends Record<string, OptionInput>>(
   description: string,
   spec: CommandSpec<O>,
 ): CommandDef {
   const options: Record<string, OptionDef> = {};
-  const specOpts: Record<string, OptionSpec> =
-    spec.options === undefined ? {} : (spec.options as Record<string, OptionSpec>);
+  const specOpts: Record<string, OptionInput> =
+    spec.options === undefined ? {} : (spec.options as Record<string, OptionInput>);
   const entries = Object.entries(specOpts);
   for (let i = 0; i < entries.length; i++) {
     const name = entries[i][0];
-    const s = entries[i][1];
-    const hasDefault = s.default !== undefined;
+    const raw = entries[i][1];
+    // Discriminate: a "~standard" or "validate" member (or a bare function)
+    // means the entry IS a schema; otherwise it is an OptionSpec literal.
+    let flag = false;
+    let short = "";
+    let desc = "";
+    let metavar = "";
+    let hasDefault = false;
+    let defaultValue: unknown = "";
+    let schemaInput: SchemaInput | undefined;
+    if (isSchemaValue(raw)) {
+      schemaInput = raw as SchemaInput;
+    } else {
+      const sp = raw as OptionSpec;
+      flag = sp.flag === true;
+      short = sp.short === undefined ? "" : sp.short;
+      desc = sp.description === undefined ? "" : sp.description;
+      metavar = sp.metavar === undefined ? "" : sp.metavar;
+      if (sp.schema !== undefined) {
+        schemaInput = sp.schema;
+      }
+      if (sp.default !== undefined) {
+        hasDefault = true;
+        defaultValue = sp.default;
+      }
+    }
     const def: OptionDef = {
-      type: s.type,
-      short: s.short === undefined ? "" : s.short,
+      flag: flag,
+      short: short,
       hasDefault: hasDefault,
-      defaultValue: hasDefault ? s.default : "",
-      description: s.description === undefined ? "" : s.description,
-      schema: normalizeSchema(s.schema, "--" + name),
+      defaultValue: defaultValue,
+      description: desc,
+      metavar: metavar,
+      schema: normalizeSchema(schemaInput, "--" + name),
     };
     if (def.short.length > 1) {
       throw new Error("E_BAD_OPTION: --" + name + " short must be a single character");
     }
     if (def.hasDefault) {
-      const dv = def.defaultValue;
-      const ok =
-        (def.type === "boolean" && typeof dv === "boolean") ||
-        (def.type === "string" && typeof dv === "string") ||
-        (def.type === "number" && typeof dv === "number");
-      if (!ok) {
-        throw new Error("E_BAD_OPTION: default for --" + name + " does not match type " + def.type);
+      // The default goes through the schema: issues → E_BAD_OPTION with the
+      // validator's own message; a morph output becomes the stored default.
+      if (def.schema !== null) {
+        const oc = validateValue(def.schema, def.defaultValue, "--" + name);
+        if (oc.error !== "") {
+          throw new Error("E_BAD_OPTION: " + oc.error);
+        }
+        if (oc.hasOut) {
+          def.defaultValue = oc.out;
+        }
+      } else {
+        const ok = def.flag
+          ? typeof def.defaultValue === "boolean"
+          : typeof def.defaultValue === "string";
+        if (!ok) {
+          throw new Error(
+            "E_BAD_OPTION: default for --" +
+              name +
+              (def.flag
+                ? " must be a boolean"
+                : " must be a string (declare a schema for other types)"),
+          );
+        }
       }
     }
     options[name] = def;
@@ -202,17 +409,29 @@ export function command<O extends Record<string, OptionSpec>>(
   };
 }
 
-// Unwrap a StandardSchemaInput to the callable validator: prefer the
-// "~standard" props (the spec's consumption path — an arktype Type or zod
-// schema carries no top-level validate), fall back to a bare validator.
-// Throws at construction when neither exists so a schema-less "schema"
-// can never silently pass.
-function normalizeSchema(
-  input: StandardSchemaInput | undefined,
-  label: string,
-): StandardValidator | null {
+// An options entry is a schema when it carries "~standard" or "validate",
+// or when it is a bare function. OptionSpec never has those members, so the
+// discriminator cannot collide (a zod schema's `.description` is never
+// reached — "~standard" wins).
+function isSchemaValue(v: unknown): boolean {
+  if (typeof v === "function") {
+    return true;
+  }
+  const s = v as StandardSchemaInput;
+  return s["~standard"] !== undefined || s.validate !== undefined;
+}
+
+// Unwrap a SchemaInput to the callable validator: a bare function first,
+// then the "~standard" props (the spec's consumption path — an arktype Type
+// or zod schema carries no top-level validate), then a bare validator.
+// Throws at construction when no validate path exists so a schema-less
+// "schema" can never silently pass.
+function normalizeSchema(input: SchemaInput | undefined, label: string): StandardValidator | null {
   if (input === undefined) {
     return null;
+  }
+  if (typeof input === "function") {
+    return { validate: input };
   }
   const std = input["~standard"];
   if (std !== undefined && std.validate !== undefined) {
@@ -283,16 +502,15 @@ function fail(msg: string): number {
 function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: string[]): number {
   const optionEntries = Object.entries(cmd.options);
   const values: Record<string, unknown> = {};
-  // Seed every declared key: explicit default, else the type's zero value.
+  // Seed every declared key: validated default, else the zero value —
+  // false for flags, "" for value-options (a schema may then coerce it).
   for (let i = 0; i < optionEntries.length; i++) {
     const name = optionEntries[i][0];
     const def = optionEntries[i][1];
     if (def.hasDefault) {
       values[name] = def.defaultValue;
-    } else if (def.type === "boolean") {
+    } else if (def.flag) {
       values[name] = false;
-    } else if (def.type === "number") {
-      values[name] = 0;
     } else {
       values[name] = "";
     }
@@ -318,7 +536,8 @@ function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: s
       return 0;
     }
     if (tok.length > 2 && tok.substring(0, 2) === "--") {
-      // --name or --name=value
+      // --name or --name=value. Attached values stay strings — the
+      // validator owns interpretation, including "false"/"0" on flags.
       let body = tok.substring(2);
       let attached = "";
       let hasAttached = false;
@@ -333,15 +552,11 @@ function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: s
         return fail("unknown option '--" + body + "'");
       }
       const def = optionEntries[k][1];
-      if (def.type === "boolean") {
+      if (def.flag) {
         if (!hasAttached) {
           values[body] = true;
-        } else if (attached === "true" || attached === "1") {
-          values[body] = true;
-        } else if (attached === "false" || attached === "0") {
-          values[body] = false;
         } else {
-          return fail("--" + body + ": expected a boolean, got '" + attached + "'");
+          values[body] = attached;
         }
       } else {
         let raw = "";
@@ -354,17 +569,14 @@ function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: s
           i = i + 1;
           raw = args[i];
         }
-        const err = setValue(values, def, body, raw, "--" + body);
-        if (err !== "") {
-          return fail(err);
-        }
+        values[body] = raw;
       }
       i = i + 1;
       continue;
     }
     if (tok.length > 1 && tok.charAt(0) === "-") {
-      // Short cluster: -u, -t 3, -t3, -ut3 (boolean shorts may cluster;
-      // a value-taking short consumes the rest of the token or next arg).
+      // Short cluster: -u, -t 3, -t3, -ut3 (flag shorts may cluster; a
+      // value-taking short consumes the rest of the token or next arg).
       let j = 1;
       while (j < tok.length) {
         const c = tok.charAt(j);
@@ -378,7 +590,7 @@ function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: s
         }
         const name = optionEntries[k][0];
         const def = optionEntries[k][1];
-        if (def.type === "boolean") {
+        if (def.flag) {
           values[name] = true;
           j = j + 1;
           continue;
@@ -396,10 +608,7 @@ function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: s
           i = i + 1;
           raw = args[i];
         }
-        const err = setValue(values, def, name, raw, "-" + c);
-        if (err !== "") {
-          return fail(err);
-        }
+        values[name] = raw;
         j = tok.length;
       }
       i = i + 1;
@@ -417,24 +626,37 @@ function runCommand(prog: ProgramSpec, cmdName: string, cmd: CommandDef, args: s
     return fail("unexpected argument '" + positionals[required] + "'");
   }
 
-  // Standard-Schema seam: per-option validators, then the command-level
-  // validator over { opts, args }. Async validators are rejected cleanly —
-  // instanceof Promise narrowing lowers fine.
+  // The schema boundary: every option's effective value (explicit, default,
+  // or zero) passes its validator and the OUTPUT is stored — morphs apply.
+  // Schema-less flags coerce "true"/"1"/"false"/"0" attached forms here.
+  // Async validators are rejected cleanly — instanceof Promise lowers fine.
   for (let e = 0; e < optionEntries.length; e++) {
     const name = optionEntries[e][0];
     const def = optionEntries[e][1];
+    const v = valueOf(values, name);
     if (def.schema !== null) {
-      const err = runValidator(def.schema, valueOf(values, name), "--" + name);
-      if (err !== "") {
-        return fail(err);
+      const oc = validateValue(def.schema, v, "--" + name);
+      if (oc.error !== "") {
+        return fail(oc.error);
+      }
+      if (oc.hasOut) {
+        values[name] = oc.out;
+      }
+    } else if (def.flag && typeof v === "string") {
+      if (v === "true" || v === "1") {
+        values[name] = true;
+      } else if (v === "false" || v === "0") {
+        values[name] = false;
+      } else {
+        return fail("--" + name + ": expected a boolean, got '" + v + "'");
       }
     }
   }
   if (cmd.schema !== null) {
     const input: ParsedInput = { opts: values, args: positionals };
-    const err = runValidator(cmd.schema, input, cmdName);
-    if (err !== "") {
-      return fail(err);
+    const oc = validateValue(cmd.schema, input, cmdName);
+    if (oc.error !== "") {
+      return fail(oc.error);
     }
   }
 
@@ -471,42 +693,39 @@ function findShort(entries: [string, OptionDef][], c: string): number {
   return -1;
 }
 
-function setValue(
-  values: Record<string, unknown>,
-  def: OptionDef,
-  name: string,
-  raw: string,
-  label: string,
-): string {
-  if (def.type === "number") {
-    const n = Number(raw);
-    if (raw === "" || Number.isNaN(n)) {
-      return label + ": expected a number, got '" + raw + "'";
-    }
-    values[name] = n;
-    return "";
-  }
-  if (def.type === "string") {
-    values[name] = raw;
-    return "";
-  }
-  return label + ": boolean option '" + name + "' takes no value";
+interface ValidateOutcome {
+  error: string; // "" = success
+  hasOut: boolean; // the validator returned a (possibly morphed) value
+  out: unknown;
 }
 
-function runValidator(v: StandardValidator, value: unknown, label: string): string {
+// Run one validator and normalize the result: issues join into one error
+// string (validator-owned messages), a success `value` becomes `out` so
+// callers can store morphed output. A Promise result is a clean error.
+function validateValue(v: StandardValidator, value: unknown, label: string): ValidateOutcome {
   const r = v.validate(value);
   if (r instanceof Promise) {
-    return label + ": async validators are not supported (schema returned a Promise)";
+    return {
+      error: label + ": async validators are not supported (schema returned a Promise)",
+      hasOut: false,
+      out: null,
+    };
   }
   const issues = r.issues;
-  if (issues === undefined || issues === null || issues.length === 0) {
-    return "";
+  if (issues !== undefined && issues !== null && issues.length > 0) {
+    let msg = label + ": ";
+    for (let i = 0; i < issues.length; i++) {
+      if (i > 0) {
+        msg = msg + "; ";
+      }
+      msg = msg + (issues[i].message === "" ? "validation failed" : issues[i].message);
+    }
+    return { error: msg, hasOut: false, out: null };
   }
-  let msg = label + ": validation failed";
-  for (let i = 0; i < issues.length; i++) {
-    msg = msg + "; " + issues[i].message;
+  if (r.value !== undefined) {
+    return { error: "", hasOut: true, out: r.value };
   }
-  return msg;
+  return { error: "", hasOut: false, out: null };
 }
 
 // ---------------------------------------------------------------- help
@@ -583,10 +802,8 @@ function printCommandHelp(prog: ProgramSpec, cmdName: string, cmd: CommandDef): 
     } else {
       label = "    --" + name;
     }
-    if (def.type === "number") {
-      label = label + " <n>";
-    } else if (def.type === "string") {
-      label = label + " <str>";
+    if (!def.flag) {
+      label = label + " <" + (def.metavar !== "" ? def.metavar : name) + ">";
     }
     let desc = def.description;
     if (def.hasDefault) {

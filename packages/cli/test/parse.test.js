@@ -1,7 +1,7 @@
 // Option/positional parsing tests for @cutils/cli — runs on the tsc build.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { command, run } from "../dist/esm/index.js";
+import { bool, command, num, run, str } from "../dist/esm/index.js";
 import { capture } from "./helpers.js";
 
 function prog(handler) {
@@ -12,9 +12,9 @@ function prog(handler) {
       greet: command("greet someone", {
         args: ["name"],
         options: {
-          upper: { type: "boolean", short: "u", description: "uppercase" },
-          times: { type: "number", short: "t", default: 1, description: "repeat" },
-          greeting: { type: "string", short: "g", description: "greeting word" },
+          upper: bool({ short: "u", description: "uppercase" }),
+          times: num({ short: "t", default: 1, description: "repeat" }),
+          greeting: str({ short: "g", description: "greeting word" }),
         },
         handler,
       }),
@@ -52,6 +52,42 @@ test("--opt value and --opt=value", () => {
   assert.equal(got[1].times, 4);
 });
 
+test("schema output replaces the raw string (morph)", () => {
+  let seen;
+  const p = {
+    name: "d",
+    commands: {
+      c: command("c", {
+        options: { count: num() },
+        handler: (opts) => {
+          seen = opts;
+        },
+      }),
+    },
+  };
+  const r = capture(() => run(p, ["c", "--count", "007"]));
+  assert.equal(r.code, 0);
+  assert.equal(seen.count, 7); // "007" → 7 — the validator's output, not the raw string
+});
+
+test("schema-less option is a raw string passthrough", () => {
+  let seen;
+  const p = {
+    name: "d",
+    commands: {
+      c: command("c", {
+        options: { note: { description: "free text" } },
+        handler: (opts) => {
+          seen = opts;
+        },
+      }),
+    },
+  };
+  const r = capture(() => run(p, ["c", "--note", "007"]));
+  assert.equal(r.code, 0);
+  assert.equal(seen.note, "007"); // no schema → no coercion
+});
+
 test("string option long and short forms", () => {
   const got = [];
   const p = prog((opts) => got.push(opts));
@@ -87,6 +123,30 @@ test("--flag=false parses boolean attached values", () => {
   assert.equal(got[0].upper, false);
   assert.equal(got[1].upper, true);
   assert.equal(got[2].upper, false);
+});
+
+test("schema-less flag coerces attached true/false/1/0, rejects the rest", () => {
+  const got = [];
+  const p = {
+    name: "d",
+    commands: {
+      c: command("c", {
+        options: { loud: { flag: true } },
+        handler: (opts) => got.push(opts),
+      }),
+    },
+  };
+  capture(() => run(p, ["c", "--loud"]));
+  capture(() => run(p, ["c", "--loud=false"]));
+  capture(() => run(p, ["c", "--loud=0"]));
+  capture(() => run(p, ["c"]));
+  assert.equal(got[0].loud, true);
+  assert.equal(got[1].loud, false);
+  assert.equal(got[2].loud, false);
+  assert.equal(got[3].loud, false);
+  const bad = capture(() => run(p, ["c", "--loud=maybe"]));
+  assert.equal(bad.code, 1);
+  assert.match(bad.err.join("\n"), /expected a boolean, got 'maybe'/);
 });
 
 test("-- ends option parsing; later tokens are positional", () => {

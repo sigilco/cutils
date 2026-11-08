@@ -1,9 +1,10 @@
 // ELF smoke app for @cutils/cli — compiled with `scriptc build` by
-// test/elf.test.sh. A two-command demo CLI: `greet` exercises boolean/
-// number/string options + short flags + a schema; `add` exercises two
-// positionals. test/elf.test.sh drives the full validation matrix.
+// test/elf.test.sh. A two-command demo CLI: `greet` exercises the bool/
+// num/str builtins (flag, bounded number, raw string) + short flags;
+// `add` exercises two positionals. test/elf.test.sh drives the full
+// validation matrix.
 
-import { command, run } from "../src/index.ts";
+import { bool, command, int, run, str } from "../src/index.ts";
 
 const prog = {
   name: "demo",
@@ -13,22 +14,9 @@ const prog = {
     greet: command("greet someone", {
       args: ["name"],
       options: {
-        upper: { type: "boolean", short: "u", description: "uppercase output" },
-        times: {
-          type: "number",
-          short: "t",
-          default: 1,
-          description: "repeat n times",
-          schema: {
-            validate: (value: unknown) => {
-              if (typeof value === "number" && value > 10) {
-                return { issues: [{ message: "times must be <= 10" }] };
-              }
-              return { value: value };
-            },
-          },
-        },
-        greeting: { type: "string", short: "g", description: "greeting word" },
+        upper: bool({ short: "u", description: "uppercase output" }),
+        times: int({ short: "t", default: 1, max: 10, description: "repeat n times" }),
+        greeting: str({ short: "g", description: "greeting word" }),
       },
       handler: (opts, args) => {
         let who = args[0];

@@ -2,7 +2,7 @@
 // stderr + exit code 1; nothing throws.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { command, run } from "../dist/esm/index.js";
+import { bool, command, num, run } from "../dist/esm/index.js";
 import { capture } from "./helpers.js";
 
 function prog() {
@@ -13,8 +13,8 @@ function prog() {
       greet: command("greet someone", {
         args: ["name"],
         options: {
-          upper: { type: "boolean", short: "u" },
-          times: { type: "number", short: "t", default: 1 },
+          upper: bool({ short: "u" }),
+          times: num({ short: "t", default: 1 }),
         },
         handler: () => {},
       }),
