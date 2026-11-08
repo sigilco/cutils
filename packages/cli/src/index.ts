@@ -27,7 +27,7 @@ export interface ValidationIssue {
 
 export interface StandardResult {
   value?: unknown;
-  issues?: ValidationIssue[] | null;
+  issues?: readonly ValidationIssue[] | null;
 }
 
 export interface StandardValidator {
