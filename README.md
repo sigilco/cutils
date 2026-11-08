@@ -14,6 +14,7 @@
 | [`@cutils/postgres`](packages/postgres) | Postgres wire driver over `node:net` + `node:crypto` (SCRAM-SHA-256, txns, LISTEN/NOTIFY), no FFI |
 | [`@cutils/mongo`](packages/mongo) | MongoDB wire driver (OP_MSG + BSON, SCRAM-SHA-1/256, txns), no FFI |
 | [`@cutils/cache`](packages/cache) | LRU + TTL in-process cache with lru-cache parity semantics |
+| [`@cutils/cli`](packages/cli) | Type-first declarative CLI builder: typed options, generated help/version, Standard-Schema seam |
 
 ## What it does
 

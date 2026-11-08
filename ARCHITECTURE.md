@@ -4,7 +4,7 @@ cutils hosts the utility packages of the chttp/scriptc ecosystem. Two scopes, on
 
 ## Scopes
 
-- **`@cutils/*`** — general-purpose utilities that own their own native dependency and ship it behind an FFI shim. `@cutils/ffi` names the shared scriptc format-7 span ABI (the same one `@cutils/sqlite` already ships). `@cutils/sqlite` is the first production consumer; `@cutils/postgres`/`@cutils/mongo` are wire drivers without FFI. The native library is vendored, the shim is fixed signatures, and the TypeScript wrapper is the only user-facing surface.
+- **`@cutils/*`** — general-purpose utilities that own their own native dependency and ship it behind an FFI shim. `@cutils/ffi` names the shared scriptc format-7 span ABI (the same one `@cutils/sqlite` already ships). `@cutils/sqlite` is the first production consumer; `@cutils/postgres`/`@cutils/mongo` are wire drivers without FFI, and `@cutils/cache`/`@cutils/cli` are pure TypeScript with no native side at all. The native library is vendored, the shim is fixed signatures, and the TypeScript wrapper is the only user-facing surface.
 - **`@chttp/*`** — request-scoped utilities that are a web-server concern, pure TypeScript over the same subset, no C. Most live in the [chttp](https://github.com/sigilco/chttp) monorepo; only `@cutils/cache` still ships from here.
 
 ## The Standard-Schema seam

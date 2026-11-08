@@ -6,6 +6,7 @@ Each package installs from npm and works the same under Node and under `scriptc 
 pnpm add @cutils/ffi       # shared format-7 FFI spec + struct echo
 pnpm add @cutils/sqlite    # embedded SQLite
 pnpm add @cutils/cache     # LRU + TTL memory cache
+pnpm add @cutils/cli       # type-first CLI builder
 ```
 
 ::: tabs
