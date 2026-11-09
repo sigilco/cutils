@@ -72,4 +72,23 @@ expect_err 1 "did you mean 'greet'?" gret x
 expect_err 1 "unexpected argument" greet a b
 expect_err 1 "expected an integer <= 10, got 99" greet --times 99 x
 
+# v1 matrix: optional/variadic positionals, option upgrades, trees, async
+expect 0 "2 tags on 2 files" tags f1 f2 --tag a b
+expect 0 "2 tags on 1 files" tags f1 --tag=a --tag=b
+expect 0 "dry 1 tags on 3 files" tags f1 f2 f3 -n --tag x
+expect_err 1 "missing required argument 'files'" tags --tag a
+expect 0 "color=auto cache=true target= out=x" opt --color x
+expect 0 "color=always cache=true target= out=x" opt --color=always x
+expect 0 "color=off cache=false target= out=null" opt --no-cache
+# env fallback: DEPLOY_TARGET feeds --target when the flag is absent
+out="$(DEPLOY_TARGET=staging "$T/cli-elf" opt)" || fail "env: exit $?"
+case "$out" in *"target=staging"*) ;; *) fail "env: stdout missing 'target=staging' (got: $out)" ;; esac
+expect 0 "web deployed" deploy web
+expect 0 "api deployed" deploy a
+expect 0 "Usage: demo deploy <command>" deploy
+expect 0 "deploy web" help deploy
+expect_err 1 "unknown command 'wbe'" deploy wbe
+expect_err 1 "did you mean 'web'" deploy wbe
+expect 0 "slow done" slow
+
 echo "elf-cli-smoke OK"

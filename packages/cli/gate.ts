@@ -17,7 +17,7 @@
 //   - Number.isNaN, Number.isInteger, startsWith-free substring compares,
 //     process.argv slice, typeof checks on unknown values
 
-import { bool, command, int, num, run, str } from "./src/index.ts";
+import { bool, command, int, num, run, runAsync, str } from "./src/index.ts";
 import type {
   CommandDef,
   OptionSpec,
@@ -167,13 +167,150 @@ const raw: CommandDef = {
   description: "raw",
   args: [],
   options: {},
+  commands: {},
+  aliases: [],
+  hidden: false,
   schema: null,
-  handler: (_opts: unknown, _args: string[]): void => {
+  handler: (_opts: unknown, _args: unknown[]): void => {
     console.log("raw");
   },
 };
 const p2: ProgramSpec = { name: "p2", commands: { raw: raw } };
 code += run(p2, ["raw"]);
+
+// ---------------------------------------------------------------- v1 probes
+// New constructs verified here: ArgSpec positionals (optional/variadic/
+// schema'd, tuple-typed handler args), the new OptionSpec fields
+// (optionalValue / variadic / negatable / env / hidden), camelCase opts
+// keys, nested `commands` + aliases + `help` pseudo-command, program-level
+// args/options/handler, async handlers + runAsync + Promise-returning
+// validators, and `process.env` reads via the env fallback.
+
+const tags = command("tag things", {
+  args: [{ name: "files", variadic: true, description: "files to tag" }],
+  options: {
+    "dry-run": bool({ short: "n", description: "no writes" }),
+    tag: { variadic: true, description: "tag(s)", metavar: "t" },
+  },
+  handler: (opts, args) => {
+    // args: [string[]] — variadic tail; opts.tag: string[]
+    const dry: boolean = opts.dryRun;
+    const list: string[] = opts.tag;
+    const files: string[] = args[0];
+    void dry;
+    console.log(String(list.length) + " tags on " + String(files.length) + " files");
+  },
+});
+
+const deep = command("deploy things", {
+  commands: {
+    web: command("deploy web", {
+      options: { target: str({ env: "DEPLOY_TARGET" }) },
+      handler: (opts, _args) => {
+        const t: string = opts.target;
+        console.log("web → " + t);
+      },
+    }),
+    api: command("deploy api", {
+      alias: "a",
+      handler: (_opts, _args) => {
+        console.log("api");
+      },
+    }),
+    secret: command("hidden leaf", {
+      hidden: true,
+      handler: (_opts, _args) => {
+        console.log("secret");
+      },
+    }),
+  },
+});
+
+const optvals = command("optional/negated", {
+  args: [{ name: "out", optional: true, description: "output" }],
+  options: {
+    color: { optionalValue: true, description: "color mode" },
+    cache: { flag: true, negatable: true, default: true, description: "caching" },
+  },
+  handler: (opts, args) => {
+    const c: string | boolean = opts.color;
+    const k: boolean = opts.cache;
+    const out = args[0];
+    void c;
+    void k;
+    void out;
+    console.log("done");
+  },
+});
+
+const tree: ProgramSpec = {
+  name: "tree",
+  version: "2.0.0",
+  options: {
+    verbose: bool({ short: "v", description: "verbose" }),
+  },
+  commands: {
+    tags: tags,
+    deploy: deep,
+    optvals: optvals,
+  },
+};
+
+code += run(tree, ["tags", "f1", "f2", "--dry-run", "--tag", "a", "b"]);
+code += run(tree, ["tags", "f1", "--tag=a", "--tag=b"]);
+code += run(tree, ["deploy", "web", "--target", "prod"]);
+code += run(tree, ["deploy", "a"]);
+code += run(tree, ["deploy", "--help"]);
+code += run(tree, ["help", "deploy", "web"]);
+code += run(tree, ["optvals", "--color", "res.txt"]);
+code += run(tree, ["optvals", "--color=always", "res.txt"]);
+code += run(tree, ["optvals", "--no-cache"]);
+code += run(tree, ["--verbose", "deploy", "web"]);
+
+// Program-level node: single-command CLI with args/options/handler at
+// root — the const-A generic infers the args tuple straight from the
+// literal at the run() call site.
+code += run(
+  {
+    name: "single",
+    args: [{ name: "who", optional: true }],
+    options: { n: num({ min: 0 }) },
+    handler: (opts, args) => {
+      const n: number = opts.n;
+      const maybe = args[0];
+      void n;
+      void maybe;
+      console.log("single");
+    },
+  },
+  ["--n", "3", "x"],
+);
+
+// Async: a Promise-returning handler and a Promise-returning validator —
+// both are clean errors under run, awaited under runAsync.
+const slowCmd = command("slow work", {
+  options: {
+    when: {
+      validate: (value: unknown): Promise<StandardResult> => {
+        return Promise.resolve({ value: value });
+      },
+    },
+  },
+  handler: async (opts, _args): Promise<void> => {
+    await Promise.resolve();
+    const w: unknown = opts.when;
+    void w;
+    console.log("slow done");
+  },
+});
+const asyncProg: ProgramSpec = { name: "asyncdemo", commands: { slow: slowCmd } };
+code += run(asyncProg, ["slow"]); // async handler rejected under run
+runAsync(asyncProg, ["slow"]).then((c) => {
+  console.log("async exit " + String(c));
+});
+runAsync(asyncProg, ["slow", "--when", "later"]).then((c) => {
+  console.log("async validator exit " + String(c));
+});
 
 if (code > 100 || optSpec.short === "zzz" || parsed.args.length === 99) {
   throw new Error("gate: unreachable");
