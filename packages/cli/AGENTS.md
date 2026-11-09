@@ -73,21 +73,63 @@ output: O}` — `output` must be a REQUIRED member, matching the Standard
 - **Help/errors go through `console.log`/`console.error`** — no
   `process.stdout` writes or patching (patching is a subset ban).
 
-## Binary size (measured 2026-11-07, scriptc 0.4.7, darwin-arm64)
+## Binary size (measured 2026-11-08, scriptc 0.4.7, darwin-arm64)
 
-`scriptc build` default flags (pre-schema-first surface; re-measure if
-quoting):
+`scriptc build` default flags, `bench/apps/` cells (argv-baseline is a
+hand-rolled equivalent app — bigger than the old 130,016 baseline because
+it parses more forms):
 
-| program                                | bytes    |
-| -------------------------------------- | -------- |
-| argv-only baseline (hand-rolled `if`s) | 130,016  |
-| one-command @cutils/cli demo (`greet`) | 456,088  |
-| **library overhead**                   | +326,072 |
+| program                 | bytes   | delta vs baseline |
+| ----------------------- | ------- | ----------------- |
+| argv-baseline           | 375,888 | —                 |
+| cli-basic (one command) | 793,640 | +417,752          |
+| cli-full (all v1)       | 980,216 | +604,328          |
 
-Reproduce: `test/size` is not shipped; rebuild the two programs described
-in git history (`feat(cutils-cli)` commit message) or any equivalent
-argv-only baseline vs `test/elf-app.ts`. No perf/size claims in the
-README until a bench cell exists.
+Tree-shaking works but is per-feature, not per-function: cli-full pays for
+the descent machinery cli-basic already carries; the extra ~187 KB is the
+variadic/optionalValue/env/negatable/async arms of the shared parse loop.
+Reproduce: `bash bench/apps/bench-elf.sh`.
+
+## Parse throughput (measured 2026-11-08, Node 24, darwin-arm64)
+
+`bench/apps/bench-node.mjs` — ops/sec, spec built once outside the loop:
+
+| cell                | ops/sec     |
+| ------------------- | ----------- |
+| @cutils/cli options | ~840,000    |
+| commander options   | ~460,000    |
+| node:util.parseArgs | ~527,000    |
+| hand-rolled argv    | ~23,300,000 |
+| @cutils/cli subtree | ~1,254,000  |
+| commander subtree   | ~627,000    |
+
+## New traps from the v1 surface (all probed by gate.ts)
+
+- **`as string[]` on a record-read value copies under scriptc**: reading a
+  `string[]` out of `Record<string, unknown>` then mutating through the
+  cast silently loses writes in the ELF (Node keeps the reference).
+  `pushVar` re-stores after every push — mutate-then-store, never
+  cast-and-mutate. Caught by the ELF smoke, invisible to coverage.
+- **Generic ProgramSpec<O,A> is a dynamic slot like the handler was**: any
+  use of `prog` before the `as ProgramHead` / concrete-instantiation
+  `as ProgramSpec<Record<...>, ArgInput[]>` casts is SC6104. Both casts
+  happen at the top of `run`/`runAsync`; keep them.
+- **`process.env[name]` reads lower** (dynamic tier only) — `env:` option
+  fallback relies on this.
+- **async lowers fully** (fn decls, arrows in records, `await`,
+  `instanceof Promise`, `.then`) — `runNodeAsync`/`assignArgsAsync`/
+  `validateOptsAsync`/`validateValueAsync`/`finishNodeAsync` duplicate the
+  sync loop because `await` is lexical; do not merge them behind a union
+  return (`number | Promise<number>` re-poisons the boundary).
+- **Recursive records are fine**: `CommandDef.commands:
+Record<string, CommandDef>` + iterative descent — no record unions.
+- **`const A` generic infers the args tuple** at `command()`/`run()` call
+  sites; `ArgsFromSpec`'s `number extends A["length"]` guard keeps plain
+  `string[]` annotations on the legacy shape.
+- **SC9001 `field ... is nullT` when consuming dist JS**: type-erased
+  `field: null` initializers degenerate; in-repo scriptc apps import
+  `src/index.ts` (gate, elf-app, bench/apps all do). The npm `./elf` entry
+  story for consumers is a known TODO — mirror packages/sqlite when done.
 
 ## Commands
 
@@ -95,4 +137,6 @@ README until a bench cell exists.
 - `scriptc coverage gate.ts` must report `compile statically (100%)` (via `scripts/scriptc-gate.sh`)
 - `bash test/elf.test.sh` — builds `test/elf-app.ts`, runs the full matrix
   (flags, `--help`, `<cmd> --help`, `--version`, unknown command +
-  suggestion, missing arg, bad value, schema rejection, builtin bounds)
+  suggestion, missing arg, bad value, schema rejection, builtin bounds,
+  variadic/optional positionals, optionalValue/negatable/env options,
+  subcommand descent + alias + `help` walk, async handler via runAsync)
