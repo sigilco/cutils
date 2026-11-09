@@ -17,7 +17,7 @@ All `packages/*` publish at one shared version via pnpm native versioning (`vers
 
 1. `pnpm change` per logical change, commit the intent file with the change.
 2. At release: `pnpm version -r` (bumps the fixed group, consumes intents, writes CHANGELOGs), then `node scripts/changelog-root.mjs`, commit, tag `v<version>`.
-3. Tag push triggers `.github/workflows/release.yml`: verifies every package.json matches the tag, publishes all packages behind the `npm-publish` environment approval.
+3. Tag push triggers `.github/workflows/release.yml`: verifies every package.json matches the tag, publishes all packages behind the `npm-publish` environment approval. Agents must never approve or reject the `npm-publish` environment themselves (no `gh api ... pending_deployments` writes) — leave the run pending for the repo owner to approve in the GitHub UI.
 
 Full procedure in [`RELEASING.md`](RELEASING.md), release notes in [`CHANGELOG.md`](CHANGELOG.md).
 
