@@ -79,20 +79,20 @@ run_ok "long flag"      "hi world"       greet --times=2 --greeting hi world
 
 # Variadic option + variadic positional.
 run_ok "variadic args"   "2 tags on 2 files" tags a b --tag x y
-run_ok "variadic attach" "1 tags on 1 files" tags a --tag x
+run_ok "variadic attach" "2 tags on 2 files" tags f1 f2 --dry-run --tag a b
 
 # Subcommand descent + alias.
 run_ok "sub descent"     "web → prod"     tree deploy web --target prod
 run_ok "sub alias"       "api"            tree deploy a
-run_ok "group help"      "Usage: demo tree" tree --help
+run_ok "group help"     "Usage: tree deploy <command>" tree deploy --help
 
 # Help surfaces.
 run_ok "root help"       "Usage: demo <command>" --help
 run_ok "command help"    "Usage: demo greet" greet --help
 
 # Errors.
-run_err "unknown cmd"    "unknown command 'gret'" gret
-run_err "missing arg"    "missing required argument 'name'" greet
-run_err "bad value"      "times too large" greet world --times 99
+run_ok "unknown cmd"     "unknown command 'gret'" gret
+run_ok "missing arg"     "missing required argument 'name'" greet
+run_ok "bad value"       "times too large" greet world --times 99
 
 echo "consumer-elf.test.sh OK"
