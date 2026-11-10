@@ -1,5 +1,11 @@
 # @cutils/sqlite
 
+## 0.7.0
+
+### Minor Changes
+
+- add db.pragma() and stmt.iterate()/each for better-sqlite3 DX parity
+
 ## 0.6.0
 
 ## 0.5.0

@@ -1,6 +1,6 @@
 {
   "name": "@cutils/ffi",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Shared scriptc format-7 FFI spec (sqlite's span ABI) plus a Rust struct-echo smoke. Compiles to a single static ELF.",
   "license": "Apache-2.0",
   "repository": {

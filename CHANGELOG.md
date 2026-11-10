@@ -3,12 +3,22 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.7.0
+
+### Features
+
+- **@cutils/cache:** elf consumer entry: ./elf export for npm-static builds
+- **@cutils/cli:** v1 spec surface: optional/variadic/schema'd positionals (ArgSpec + ArgsFromSpec tuple typing), optionalValue/variadic/negatable/env/camelCase/hidden options, nested subcommand trees + program-level node + aliases + help walk, runAsync for async handlers and validators — plus bench/apps cells (~840k ops/s vs commander's ~460k)
+- **@cutils/cli:** elf consumer entry: ./elf export + JSDoc contract fixes SC9001 nullT
+- **@cutils/mongo:** elf consumer entry: ./elf export + createConnection options form + JSDoc contract for npm-static builds
+- **@cutils/sqlite:** add db.pragma() and stmt.iterate()/each for better-sqlite3 DX parity
+<!-- release:end -->
+
 ## 0.6.0
 
 ### Features
 
 - **@cutils/cli:** Initial release: Standard-Schema-first declarative CLI builder (`command`/`run` + `str`/`num`/`int`/`bool` builtins) — `opts` types derive entirely from the schema's `types.output` channel; validators own all coercion and errors; compiles statically into the app ELF.
-<!-- release:end -->
 
 ## 0.5.0
 

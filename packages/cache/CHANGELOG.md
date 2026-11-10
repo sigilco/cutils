@@ -1,5 +1,11 @@
 # @cutils/cache
 
+## 0.7.0
+
+### Minor Changes
+
+- elf consumer entry: ./elf export for npm-static builds
+
 ## 0.6.0
 
 ## 0.5.0
