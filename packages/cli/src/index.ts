@@ -328,6 +328,10 @@ export interface ParsedInput {
 // inference works without any schema library installed. Extra OptionSpec
 // fields in `extra` (and metavar overrides) merge over the defaults.
 
+/**
+ * @param {BuiltinOptsTwin} [extra]
+ * @returns {{schema?: ValidatorTwin, flag?: boolean, optionalValue?: boolean, variadic?: boolean, negatable?: boolean, short?: string, env?: string, hidden?: boolean, default?: unknown, description?: string, metavar?: string}}
+ */
 export function str(extra?: BuiltinOpts): OptionSpec & { schema: TypedValidator<string> } {
   const v: TypedValidator<string> = {
     validate: (value: unknown): StandardResult => {
@@ -338,7 +342,12 @@ export function str(extra?: BuiltinOpts): OptionSpec & { schema: TypedValidator<
     },
   };
   const spec: OptionSpec = { schema: v, metavar: "str" };
-  return mergeExtra(spec, extra) as OptionSpec & { schema: TypedValidator<string> };
+  // The @returns twin is the boundary type consumers see under
+  // --npm-static; the cast agrees with it, so it lowers as a no-op
+  // instead of a copy (SC6001) where Node shares the reference.
+  return mergeExtra(spec, extra) as OptionSpec & {
+    schema: TypedValidator<string>;
+  };
 }
 
 export function num(extra?: NumOpts): OptionSpec & { schema: TypedValidator<number> } {
@@ -364,7 +373,9 @@ export function num(extra?: NumOpts): OptionSpec & { schema: TypedValidator<numb
     },
   };
   const spec: OptionSpec = { schema: v, metavar: "n" };
-  return mergeExtra(spec, extra) as OptionSpec & { schema: TypedValidator<number> };
+  return mergeExtra(spec, extra) as OptionSpec & {
+    schema: TypedValidator<number>;
+  };
 }
 
 export function int(extra?: NumOpts): OptionSpec & { schema: TypedValidator<number> } {
@@ -393,7 +404,9 @@ export function int(extra?: NumOpts): OptionSpec & { schema: TypedValidator<numb
     },
   };
   const spec: OptionSpec = { schema: v, metavar: "int" };
-  return mergeExtra(spec, extra) as OptionSpec & { schema: TypedValidator<number> };
+  return mergeExtra(spec, extra) as OptionSpec & {
+    schema: TypedValidator<number>;
+  };
 }
 
 export function bool(
@@ -411,9 +424,17 @@ export function bool(
     },
   };
   const spec: OptionSpec = { flag: true, schema: v };
-  return mergeExtra(spec, extra) as OptionSpec & { flag: true; schema: TypedValidator<boolean> };
+  return mergeExtra(spec, extra) as OptionSpec & {
+    flag: true;
+    schema: TypedValidator<boolean>;
+  };
 }
 
+/**
+ * @param {{schema?: ValidatorTwin, flag?: boolean, optionalValue?: boolean, variadic?: boolean, negatable?: boolean, short?: string, env?: string, hidden?: boolean, default?: unknown, description?: string, metavar?: string}} spec
+ * @param {{flag?: boolean, optionalValue?: boolean, variadic?: boolean, negatable?: boolean, short?: string, env?: string, hidden?: boolean, default?: unknown, description?: string, metavar?: string}} [extra]
+ * @returns {{schema?: ValidatorTwin, flag?: boolean, optionalValue?: boolean, variadic?: boolean, negatable?: boolean, short?: string, env?: string, hidden?: boolean, default?: unknown, description?: string, metavar?: string}}
+ */
 function mergeExtra(spec: OptionSpec, extra?: BuiltinOpts): OptionSpec {
   const out: OptionSpec = {};
   if (spec.schema !== undefined) {
@@ -451,6 +472,11 @@ function mergeExtra(spec: OptionSpec, extra?: BuiltinOpts): OptionSpec {
 
 // ---------------------------------------------------------------- command()
 
+/**
+ * @param {string} description
+ * @param {{args?: unknown[], options?: Record<string, unknown>, schema?: SchemaInputTwin, handler?: (opts: unknown, args: unknown[]) => unknown, commands?: Record<string, unknown>, alias?: string | string[], hidden?: boolean}} spec
+ * @returns {{description: string, args: {name: string, optional: boolean, variadic: boolean, hasDefault: boolean, defaultValue: unknown, description: string, schema: ValidatorTwin | null}[], options: Record<string, {flag: boolean, optionalValue: boolean, variadic: boolean, negatable: boolean, short: string, envName: string, hidden: boolean, hasDefault: boolean, defaultValue: unknown, description: string, metavar: string, schema: ValidatorTwin | null, optsKey: string}>, commands: Record<string, unknown>, aliases: string[], hidden: boolean, schema: ValidatorTwin | null, handler: ((opts: unknown, args: string[]) => unknown) | null}}
+ */
 export function command<
   O extends Record<string, OptionInput>,
   const A extends readonly ArgInput[] = readonly ArgInput[],
@@ -511,6 +537,10 @@ export function camelKey(name: string): string {
   return out;
 }
 
+/**
+ * @param {Record<string, unknown>} specOpts
+ * @returns {Record<string, {flag: boolean, optionalValue: boolean, variadic: boolean, negatable: boolean, short: string, envName: string, hidden: boolean, hasDefault: boolean, defaultValue: unknown, description: string, metavar: string, schema: ValidatorTwin | null, optsKey: string}>}
+ */
 function normalizeOptions(specOpts: Record<string, OptionInput>): Record<string, OptionDef> {
   const options: Record<string, OptionDef> = {};
   const entries = Object.entries(specOpts);
@@ -646,7 +676,13 @@ function normalizeOptions(specOpts: Record<string, OptionInput>): Record<string,
   return options;
 }
 
-function normalizeArgs(specArgs: readonly ArgInput[]): ArgDef[] {
+function normalizeArgs(
+  /**
+   * @param {readonly (string | {name: string, optional?: boolean, variadic?: boolean, description?: string, schema?: SchemaInputTwin, default?: unknown})[]} specArgs
+   * @returns {{name: string, optional: boolean, variadic: boolean, hasDefault: boolean, defaultValue: unknown, description: string, schema: ValidatorTwin | null}[]}
+   */
+  specArgs: readonly ArgInput[],
+): ArgDef[] {
   const defs: ArgDef[] = [];
   let sawOptional = false;
   for (let i = 0; i < specArgs.length; i++) {
@@ -718,7 +754,18 @@ function isSchemaValue(v: unknown): boolean {
 // or zod schema carries no top-level validate), then a bare validator.
 // Throws at construction when no validate path exists so a schema-less
 // "schema" can never silently pass.
-function normalizeSchema(input: SchemaInput | undefined, label: string): StandardValidator | null {
+function normalizeSchema(
+  input: SchemaInput | undefined,
+  label: string,
+): StandardValidator | null {
+  // JSDoc twin for --npm-static consumers (no .d.ts surface): the literal
+  // shape is what makes the `schema` member of OptionDef/ArgDef records
+  // concrete under dist-JS inference (SC9001 "field is nullT" without it).
+  /**
+   * @param {SchemaInputTwin | undefined} input
+   * @param {string} label
+   * @returns {ValidatorTwin | null}
+   */
   if (input === undefined) {
     return null;
   }

@@ -20,7 +20,8 @@
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./elf": "./dist/esm/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
