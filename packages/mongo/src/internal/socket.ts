@@ -3,7 +3,7 @@
 // commands sequentially on the owned socket. A response read gathers the
 // 4-byte length prefix then exactly messageLength bytes.
 
-import { connect as netConnect, Socket } from "node:net";
+import { createConnection, Socket } from "node:net";
 import { connect as tlsConnectRaw } from "node:tls";
 import { mongoError } from "../errors.ts";
 
@@ -144,12 +144,17 @@ export class SocketChannel {
   }
 }
 
-/** Connect a plain TCP channel. */
+/**
+ * Connect a plain TCP channel.
+ * @param {string} host
+ * @param {number} port
+ * @param {number} timeoutMs
+ */
 export function connectTcp(host: string, port: number, timeoutMs: number): Promise<SocketChannel> {
   return new Promise<SocketChannel>((resolve, reject) => {
     const ch = new SocketChannel();
     let settled = false;
-    const sock = netConnect(port, host);
+    const sock = createConnection({ host: host, port: port });
     sock.setTimeout(timeoutMs);
     sock.once("connect", () => {
       settled = true;
