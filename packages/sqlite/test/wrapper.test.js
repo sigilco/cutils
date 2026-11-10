@@ -205,6 +205,77 @@ test("pragma, columns, expanded sql, bind", () => {
   db.close();
 });
 
+test("pragmaNamed: read and write forms", () => {
+  const db = fresh();
+  const before = db.pragmaNamed("user_version");
+  assert.equal(before.length, 1);
+  assert.equal(before[0].user_version, 0);
+
+  const wr = db.pragmaNamed("user_version", 42);
+  assert.equal(wr.changes, 0);
+  const after = db.pragmaNamed("user_version");
+  assert.equal(after[0].user_version, 42);
+
+  db.pragmaNamed("journal_mode", "MEMORY");
+  const jm = db.pragmaNamed("journal_mode");
+  assert.equal(String(jm[0].journal_mode).toUpperCase(), "MEMORY");
+
+  // double-quoted identifier: mixed case + digits + underscore survive
+  db.exec("CREATE TABLE t2 (a)");
+  db.pragmaNamed("temp_store", 1);
+  assert.equal(db.pragmaNamed("temp_store")[0].temp_store, 1);
+
+  // injection attempt must be rejected, not interpolated
+  assert.throws(
+    () => db.pragmaNamed("user_version; DROP TABLE todos"),
+    (e) => e.code === "SQLITE_MISUSE",
+  );
+  assert.throws(
+    () => db.pragmaNamed(""),
+    (e) => e.code === "SQLITE_MISUSE",
+  );
+  db.close();
+});
+
+test("iterate: rows one at a time, lazily", () => {
+  const db = fresh();
+  const ins = db.prepareRaw("INSERT INTO todos (title, done) VALUES (?, ?)");
+  ins.run(["i1", 0]);
+  ins.run(["i2", 1]);
+  ins.run(["i3", 0]);
+  ins.finalize();
+
+  const sel = db.prepareRaw("SELECT title FROM todos WHERE done = 0 ORDER BY id");
+  const it = sel.iterate([]);
+  const seen = [];
+  for (const row of it) {
+    seen.push(row.title);
+  }
+  assert.deepEqual(seen, ["i1", "i3"]);
+
+  // manual next() driving + done detection
+  const it2 = sel.iterate([]);
+  assert.deepEqual(it2.next().value, { title: "i1" });
+  assert.equal(it2.next().done, false);
+  assert.equal(it2.next().done, true);
+  sel.finalize();
+
+  // named-parameter bind form + empty reuse
+  const sel2 = db.prepareRaw("SELECT title FROM todos WHERE done = :d ORDER BY id");
+  const one = Array.from(sel2.iterate({ d: 1 })).map((r) => r.title);
+  assert.deepEqual(one, ["i2"]);
+  sel2.finalize();
+
+  // iterate on a finalized statement throws eagerly at the call
+  const dead = db.prepareRaw("SELECT 1");
+  dead.finalize();
+  assert.throws(
+    () => dead.iterate([]),
+    (e) => e.code === "SQLITE_MISUSE",
+  );
+  db.close();
+});
+
 test("errors: SqliteError codes propagate", () => {
   const db = fresh();
   assert.throws(

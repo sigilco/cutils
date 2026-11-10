@@ -140,6 +140,99 @@ function main(): void {
   const pv = db.pragma("user_version");
   check(pv.rows.length === 1, "pragma() rows");
 
+  // pragmaNamed read form: row objects keyed by pragma name.
+  const pn = db.pragmaNamed("user_version");
+  check(pn.length === 1, "pragmaNamed() read");
+  check(pn[0].user_version === 0, "pragmaNamed() user_version default");
+
+  // pragmaNamed write form: numeric, string, boolean values.
+  db.pragmaNamed("user_version", 42);
+  check(db.pragmaNamed("user_version")[0].user_version === 42, "pragmaNamed() numeric write");
+  db.pragmaNamed("journal_mode", "MEMORY");
+  check(
+    String(db.pragmaNamed("journal_mode")[0].journal_mode).toUpperCase() === "MEMORY",
+    "pragmaNamed() string write",
+  );
+  db.pragmaNamed("user_version", true);
+  check(db.pragmaNamed("user_version")[0].user_version === 1, "pragmaNamed() boolean write");
+  db.pragmaNamed("user_version", 0);
+  check(db.pragmaNamed("user_version")[0].user_version === 0, "pragmaNamed() reset write");
+  check(db.pragmaNamed("user_version", 7).changes >= 0, "pragmaNamed() write returns RunResult");
+
+  // Injection rejection: identifier position is validated, never interpolated.
+  let pcode = "";
+  try {
+    db.pragmaNamed("user_version; DROP TABLE todos");
+  } catch (e) {
+    if (e instanceof SqliteError) {
+      pcode = e.code;
+    }
+  }
+  check(pcode === "SQLITE_MISUSE", "pragmaNamed() rejects injection name");
+  let pcode2 = "";
+  try {
+    db.pragmaNamed("");
+  } catch (e) {
+    if (e instanceof SqliteError) {
+      pcode2 = e.code;
+    }
+  }
+  check(pcode2 === "SQLITE_MISUSE", "pragmaNamed() rejects empty name");
+  // A pragma name with a quote must be rejected, not double-quoted through.
+  let pcode3 = "";
+  try {
+    db.pragmaNamed('us"er_version');
+  } catch (e) {
+    if (e instanceof SqliteError) {
+      pcode3 = e.code;
+    }
+  }
+  check(pcode3 === "SQLITE_MISUSE", "pragmaNamed() rejects quote in name");
+
+  // iterate: one row per step through a generator, plus manual next().
+  const itSel = db.prepareRaw("SELECT title FROM todos WHERE done = 0 ORDER BY id");
+  let itCount = 0;
+  let firstTitle = "";
+  for (const row of itSel.iterate([])) {
+    itCount += 1;
+    if (itCount === 1) {
+      firstTitle = String((row as Row).title);
+    }
+  }
+  check(itCount === 1, "iterate() row count");
+  check(firstTitle === "write docs", "iterate() first row");
+
+  const manual = itSel.iterate([]);
+  const m1 = manual.next();
+  check(m1.done === false, "iterate() not done on first");
+  check((m1.value as Row).title === "write docs", "iterate() manual first");
+  check(manual.next().done === true, "iterate() done at exhaustion");
+
+  // Named-parameter bind form.
+  const named = db.prepareRaw("SELECT title FROM todos WHERE done = :d ORDER BY id");
+  let done1 = 0;
+  for (const row of named.iterate({ d: 1 })) {
+    if ((row as Row).title === "raw insert") {
+      done1 += 1;
+    }
+  }
+  check(done1 === 1, "iterate() named params");
+  named.finalize();
+  itSel.finalize();
+
+  // iterate on a finalized statement throws eagerly (MISUSE), not lazily.
+  const dead = db.prepareRaw("SELECT 1 AS one");
+  dead.finalize();
+  let icode = "";
+  try {
+    dead.iterate([]);
+  } catch (e) {
+    if (e instanceof SqliteError) {
+      icode = e.code;
+    }
+  }
+  check(icode === "SQLITE_MISUSE", "iterate() on finalized stmt");
+
   // Transactions: commit, auto-savepoint on nesting, explicit savepoint,
   // rollback, and error-driven rollback via dispose.
   {
