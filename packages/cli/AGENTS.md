@@ -127,9 +127,42 @@ Record<string, CommandDef>` + iterative descent — no record unions.
   sites; `ArgsFromSpec`'s `number extends A["length"]` guard keeps plain
   `string[]` annotations on the legacy shape.
 - **SC9001 `field ... is nullT` when consuming dist JS**: type-erased
-  `field: null` initializers degenerate; in-repo scriptc apps import
-  `src/index.ts` (gate, elf-app, bench/apps all do). The npm `./elf` entry
-  story for consumers is a known TODO — mirror packages/sqlite when done.
+  `field: null` initializers degenerate. FIXED for the npm path: the
+  `./elf` entry (dist JS) carries JSDoc twins on every signature that
+  builds or returns OptionDef/ArgDef/CommandDef records — `str`/`num`/
+  `int`/`bool`, `mergeExtra`, `command`, `normalizeOptions`,
+  `normalizeArgs`, `normalizeSchema` — using inline literal object types
+  (`ValidatorTwin` etc. live as `/** @typedef */` comments in the source;
+  interfaces cannot be named without a `.d.ts`). Verified by
+  `test/consumer-elf.test.sh`: gate.ts + test/elf-app.ts compile
+  error-free from the packed tarball under `--npm-static`. If you add a
+  function that returns a record with a `| null` member, give it the same
+  twin or consumers hit SC9001 again.
+
+## Checked-dynamic warnings from `--npm-static` (triaged, acceptable)
+
+Building test/elf-app.ts against the packed `./elf` tarball on scriptc
+0.4.10 reports 2 (elf-app) / 4 (gate.ts) SC6001 warnings — the in-repo
+build reports none. All remaining sites are the same pattern:
+
+- **Factory `extra` merges (`num`/`int`/`bool` → `mergeExtra`)**:
+  "converting this `{min: number}` / `{default, max, min}` /
+  `{description, short}` to the merged OptionDef shape copies it".
+  The consumer's `extra` literal (e.g. `{min: 0}`) is inferred as a
+  narrower record and the `@returns` twin widens it; scriptc conservatively
+  assumes the conversion copies. **Acceptable because** `mergeExtra` only
+  reads `extra` member-by-member into a fresh `out` record; the source
+  object is never written through the merged alias and no identity
+  comparison happens anywhere in the package (verified: zero `===` on
+  option-def objects), so a hypothetical copy is unobservable. Fixing it
+  would require declaring `extra` with the full widened shape at every
+  call site, which defeats the ergonomic partial-literal API.
+- Same story on the direct `str()` site in elf-app/gate: the twin's
+  merged shape vs the `{schema, metavar}` literal. Same non-observation
+  argument applies.
+
+The bar: **zero errors, zero SC9001/SC2020/SC6104** from `--npm-static`;
+SC6001 copy warnings at factory call sites are recorded-acceptable.
 
 ## Commands
 
