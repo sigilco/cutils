@@ -87,3 +87,19 @@ not reselect after a primary step-down.
 
 Connection pool, async iterators, exhaust cursors, change streams,
 decimal128/timestamp/DbRef encode, `for await`, FFI.
+
+## Consumer compile contract (`--npm-static`)
+
+- `./elf` (→ `./dist/esm/index.js`) is the consumer entry — conditional
+  `exports` objects resolve to nothing under `--npm-static`, so it stays
+  a plain string, like postgres/cache/cli.
+- The `.d.ts` is hidden in that mode; signatures whose params would
+  infer `unknown` need `@param {T}` JSDoc that survives tsc (see
+  `connectTcp` in `src/internal/socket.ts` — an `unknown` `port` hit the
+  unlowered `createConnection` overload, SC2020).
+- Use `createConnection({ host, port })` (options-object form), never
+  positional `connect(port, host)` — under JS inference the positional
+  form binds `host` into a listener slot ("expected function, got
+  string" at runtime).
+- `test/consumer-elf.test.sh` packs → installs → `--npm-static` compiles
+  `test/consumer-elf-app.ts` → runs the ELF vs `test/mock-server.mjs`.
