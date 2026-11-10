@@ -481,6 +481,43 @@ class StmtCore implements Disposable {
     }
   }
 
+  iterate<TRow>(params: BindValue[]): Generator<TRow>;
+  iterate<TRow>(params: BindRecord): Generator<TRow>;
+  iterate(params: unknown): Generator<unknown> {
+    // Bind eagerly (a finalized statement throws here, not on first next()),
+    // then hand out the lazy row-at-a-time generator over the current
+    // bindings. An omitted or EMPTY params arg keeps the existing bindings,
+    // mirroring all()/get() semantics.
+    this._checkLive();
+    let bound = params;
+    if (this._schema !== null && typeof params !== "undefined") {
+      bound = validateRow(this._schema, params);
+    }
+    this._bindParams(bound);
+    return this._iterateBound();
+  }
+
+  *_iterateBound(): Generator<unknown> {
+    // No per-row reset: sqlite3_reset rewinds the statement, so resetting
+    // between rows would replay the query forever. The statement is left
+    // at the last row until DONE (or the consumer re-binds, which resets
+    // via _bindParams).
+    for (;;) {
+      const rc = ffiStep(this._stmt);
+      if (rc === STEP_ROW) {
+        yield this._validateOut(this._readRow());
+        continue;
+      }
+      if (rc === STEP_DONE) {
+        ffiReset(this._stmt);
+        return;
+      }
+      ffiReset(this._stmt);
+      this._db._throwDb(rc, "step failed");
+      return;
+    }
+  }
+
   bind(params: BindValue[]): StmtCore;
   bind(params: BindRecord): StmtCore;
   bind(params: unknown): StmtCore {
@@ -588,6 +625,8 @@ export interface Stmt<TRow = unknown> extends StmtCore {
   allRaw(params: BindRecord): unknown[];
   bind(params: BindValue[]): this;
   bind(params: BindRecord): this;
+  iterate(params: BindValue[]): Generator<TRow>;
+  iterate(params: BindRecord): Generator<TRow>;
 }
 
 export const Stmt = StmtCore;
@@ -780,6 +819,54 @@ export class Database implements Disposable {
       out.push(rows[i] as Row);
     }
     return { rows: out };
+  }
+
+  pragmaNamed(name: string): Row[];
+  pragmaNamed(name: string, value: number): RunResult;
+  pragmaNamed(name: string, value: string): RunResult;
+  pragmaNamed(name: string, value: boolean): RunResult;
+  pragmaNamed(name: string, value?: number | string | boolean): Row[] | RunResult {
+    // better-sqlite3 DX: `pragma(name)` reads, `pragma(name, value)` writes.
+    // The name is an identifier position — no binding exists there — so it
+    // is validated (no injection surface) and double-quoted instead of
+    // interpolated raw. The value IS parameterized (`PRAGMA x = ?`).
+    if (name.length === 0 || !/^[A-Za-z0-9_$]+$/.test(name)) {
+      throw new SqliteError("SQLITE_MISUSE", "invalid pragma name: " + name);
+    }
+    this._checkOpen();
+    if (typeof value === "undefined") {
+      const stmt = this._prepareCore('PRAGMA "' + name + '"', null);
+      const rows = stmt.allRaw([]);
+      stmt.finalize();
+      const out: Row[] = [];
+      for (let i = 0; i < rows.length; i++) {
+        out.push(rows[i] as Row);
+      }
+      return out;
+    }
+    // The value slot in `PRAGMA x = ?` does not accept bound parameters
+    // (the pragma parser takes a literal), so the value goes into the SQL
+    // as a literal: numbers directly, strings single-quoted with ''-escaped
+    // quotes, booleans as 0/1, null as NULL — better-sqlite3's convention.
+    let lit: string;
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) {
+        throw new SqliteError("SQLITE_MISUSE", "pragma value must be finite");
+      }
+      lit = String(value);
+    } else if (typeof value === "boolean") {
+      lit = value ? "1" : "0";
+    } else {
+      lit = "'" + value.replace(/'/g, "''") + "'";
+    }
+    const stmt = this._prepareCore('PRAGMA "' + name + '" = ' + lit, null);
+    stmt._drain();
+    const result: RunResult = {
+      changes: stmt.database.changes(),
+      lastInsertRowid: stmt.database.lastInsertRowid(),
+    };
+    stmt.finalize();
+    return result;
   }
 
   transaction(): Transaction {
