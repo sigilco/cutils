@@ -26,7 +26,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/*.test.js test/*.test.mjs && bash test/elf.test.sh"
+    "test": "npm run build && node --test test/*.test.js test/*.test.mjs && bash test/elf.test.sh && bash test/consumer-elf.test.sh"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
