@@ -123,6 +123,21 @@ the package-relative `./build/libsqlite3-shim.a` (the tarball ships the
 archive). Do not pass `vendor/manifest.json` — its `../build/...` path only
 resolves inside this repo.
 
+### macOS, Windows and cross-compiles
+
+The archive in the tarball is built on Linux. For any other target, build one
+for it with the shipped script (SQLite is compiled with FTS5) and point
+`--ffi` at the manifest it writes:
+
+```sh
+node node_modules/@cutils/sqlite/scripts/build-shim.mjs --out ./shim
+scriptc build app.ts --npm-static @cutils/sqlite --ffi ./shim/ffi.json
+
+# cross-compile with zig as the toolchain
+CC="zig cc" AR="zig ar" node node_modules/@cutils/sqlite/scripts/build-shim.mjs \
+  --out ./shim-win --target x86_64-windows-gnu
+```
+
 ## Binary size
 
 Indicative `scriptc build` sizes for a scriptc app (your app's size varies —
