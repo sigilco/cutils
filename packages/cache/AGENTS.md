@@ -13,6 +13,27 @@
 - **`scriptc coverage packages/cache/gate.ts` must stay at 100%** (via `scripts/scriptc-gate.sh`), and `test/elf.test.sh` must keep passing — 0.3.3 defers some fences to runtime, so the build+run is the real gate.
 - `scriptc` reports ANY program type error as `SC2013 cannot compile npm package '<pkg>' statically`, blaming an npm import even when the package is fine. When a consumer sees it, run `tsc --noEmit` first.
 
+## Consumer compile contract (`--npm-static`)
+
+- `"./elf": "./dist/esm/index.js"` is the consumer entry (mirrors
+  `@cutils/postgres`). scriptc's `--npm-static` compiles the shipped JS
+  with inference: the `.d.ts` surface is hidden, export conditions and
+  `.ts` targets resolve to nothing, so consumers import
+  `@cutils/cache/elf` and the bare `@cutils/cache` import stays
+  workspace-only.
+- No extra JSDoc is needed today (audited 2026-11-10 against scriptc
+  0.4.7): every class field is concretely initialized, `opts`/`value`/
+  `key` infer from the shipped JS, and the `CacheEntry` record's
+  `unknown` members are legal. Keep it that way — if you add a field
+  without an initializer or a param whose type would infer `unknown`,
+  follow the postgres JSDoc contract (`@param`/`@returns` that survive
+  `tsc`, inline literal object types, `/** @type */` casts) before the
+  consumer smoke passes again.
+- `bash test/consumer-elf.test.sh` is the packaging regression gate: it
+  packs the tarball, installs it into `build/consumer-smoke/`, compiles
+  the get/set/has/delete/peek + TTL matrix against `@cutils/cache/elf`
+  with `--npm-static`, and runs the ELF.
+
 ## lru-cache divergences (keep the README table in sync)
 
 | lru-cache                                                     | @cutils/cache                                                       | Why                                                           |
