@@ -52,14 +52,16 @@ scriptc build src/main.ts -o demo
 
 The `command()` spec is a plain record literal. `OptsFromOptions` maps each options entry into the handler's `opts` parameter through Standard Schema's `types.output` channel — parse rules, types, `--help` output, and error messages all come from one static schema, no runtime reflection.
 
-- `args` names required positionals, in order. Extra positionals are an `unexpected argument` error.
+- The program is a root command node: `ProgramSpec` carries the same `args`/`options`/`schema`/`handler`/`commands` fields as every `command()` spec — a program can be a pure dispatcher, a single-command CLI (no `commands` needed), or both.
+- `args` entries are `"name"` (required positional) or `ArgSpec` — `{name, optional, variadic, default, description, schema}`. Optional args absent → `default` else `null`; `variadic` (last only) collects the rest into an array slot; `schema` validates each element. Handler `args` is a mapped tuple via `ArgsFromSpec`.
 - `options` entries are `OptionSpec`, a whole schema object, or a bare `(v) => result` function — discriminated by `~standard`/`validate` presence (or `typeof === "function"`).
-- `OptionSpec` has no `type`: `flag` (consumes no value) is the only parse fact; `schema` adds validation + typing; `short`, `default` (validated through `validate()` at `command()`), `description`, `metavar` (help hint, defaults to the name).
-- Validators receive the raw argv string; the returned `value` is what `opts` gets — morphs apply to explicit values and defaults. Absent options: `default`, else `false` for flags / `""` for value-options — a schema that rejects `""` is effectively required.
-- `str()`/`num()`/`int()`/`bool()` builtins are zero-dep Standard-Schema-shaped validators with `types.output` declared — `num({min, max})` both infers `opts.x: number` and enforces bounds.
-- Foreign schemas plug straight in: `schema: myZod`, `schema: myArktype`, `schema: mySchema["~standard"]`, or drop a whole schema object in as the option entry itself. Async validators are rejected cleanly.
-- Parsing: `--opt`, `--opt=v`, `--opt v`, `-s`, `-s v`, `-sV`, clustered flag shorts (`-ut3`), `--flag=false`, `--` end-of-options, `-h` (yields to a declared `short: "h"`).
-- Generated: `--help`/`-h` at program and command level, `--version`, unknown-command suggestions, labelled errors.
-- `run` returns the exit code and never exits itself: `process.exit(run({...}))`, or pass `argv` as a test seam.
+- `OptionSpec`: `flag` (consumes no value), `optionalValue` (`--opt` bare → `true`, `--opt=v` → `"v"`), `variadic` (`--tag a b` / `--tag a --tag b` → `O[]`, per-element schema), `negatable` (flag: `--no-x` → `false`), `short`, `default` (validated at `command()`), `env` (`process.env` fallback), `description`, `metavar`, `hidden`.
+- Kebab-case option keys normalize `opts` to camelCase (`"template-engine"` → `opts.templateEngine`).
+- `commands` nests to any depth: a group is a `command()` whose spec has `commands` (handler optional — present = default action). Options before a subcommand token bind the parent; parent opts/args/schema validate before descent. `alias` adds invocation names (`name|alias` in help). `prog help <path…>` prints any node's help.
+- Validators receive the raw argv string; the returned `value` is what `opts` gets — morphs apply to explicit values and defaults. Absent options: `default`, else `env`, else `false` for flags / `""` for value-options.
+- `str()`/`num()`/`int()`/`bool()` builtins are zero-dep Standard-Schema-shaped validators with `types.output` declared.
+- `run` is fully sync — async handlers or Promise-returning validators are clean errors pointing at `runAsync(prog)`, which awaits both. Entry idiom: `runAsync(prog).then((c) => process.exit(c))`.
+- Parsing: `--opt`, `--opt=v`, `--opt v`, `-s`, `-s v`, `-sV`, clustered flag shorts (`-ut3`), `--flag=false`, `--no-x`, `--` end-of-options, `-h` (yields to a declared `short: "h"` at every level).
+- Generated: `--help`/`-h` at every node, `--version` (root), unknown-command suggestions (aliases included), labelled errors.
 
-See the [package README](https://github.com/sigilco/cutils/tree/main/packages/cli#readme) for the full surface and the commander divergence table.
+See the [package README](https://github.com/sigilco/cutils/tree/main/packages/cli#readme) for the full surface and the commander migration table.

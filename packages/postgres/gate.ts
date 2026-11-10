@@ -7,7 +7,7 @@
 // The inline schema uses the same shape @chttp/val uses: `~standard` is a
 // class instance whose `validate` is a METHOD.
 
-import { Database, PgError, StandardSchemaV1, StdProps } from "./src/index.ts";
+import { Database, PgError, StandardSchemaV1, Stmt, StdProps } from "./src/index.ts";
 import type { Row } from "./src/index.ts";
 
 class GateProps extends StdProps {
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
   check(ins.schema !== null, "stmt.schema");
   check(ins.source.length > 0, "stmt.source");
   check(ins.source.indexOf(":title") >= 0, "stmt.source is original sql");
-  const str = ins.toString();
+  const str = (ins as InstanceType<typeof Stmt>).toString();
   check(str.length > 0, "stmt.toString non-empty");
   const r1 = await ins.run({ title: "write docs", done: false });
   check(r1.rowCount === 1, "run rowCount");

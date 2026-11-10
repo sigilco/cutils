@@ -15,7 +15,7 @@ Releases are packed and published with pnpm, never npm. Internal ranges are `wor
 
 ## What CI does
 
-The tag push triggers `.github/workflows/release.yml`. It verifies every package.json matches the tag, then publishes all packages with `pnpm publish` behind the `npm-publish` environment approval, then creates the GitHub release.
+The tag push triggers `.github/workflows/release.yml`. It verifies every package.json matches the tag, then publishes all packages with `pnpm publish` behind the `npm-publish` environment approval, then creates the GitHub release. Agents must never approve or reject the `npm-publish` environment themselves (no `gh api ... pending_deployments` writes) — leave the run pending for the repo owner to approve in the GitHub UI.
 
 ## Retrying
 
