@@ -3,6 +3,13 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.8.0
+
+### Features
+
+- **@cutils/sqlite:** Build SQLite with FTS5 and ship `scripts/build-shim.mjs` to build the shim archive plus a matching ffi manifest for any target (macOS, Windows, cross-compiles via `zig cc`); the tarball archive is Linux-only.
+<!-- release:end -->
+
 ## 0.7.0
 
 ### Features
@@ -12,7 +19,6 @@
 - **@cutils/cli:** elf consumer entry: ./elf export + JSDoc contract fixes SC9001 nullT
 - **@cutils/mongo:** elf consumer entry: ./elf export + createConnection options form + JSDoc contract for npm-static builds
 - **@cutils/sqlite:** add db.pragma() and stmt.iterate()/each for better-sqlite3 DX parity
-<!-- release:end -->
 
 ## 0.6.0
 
