@@ -26,10 +26,11 @@ If these checksums ever differ, the files were modified or corrupted — do not
 ship them; re-vendor from upstream instead.
 
 Compiled with `-O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION
--DSQLITE_ENABLE_COLUMN_METADATA`:
+-DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_FTS5`:
 
 - `SQLITE_THREADSAFE=0` — single-connection, single-threaded model; matches the
   wrapper's `Database` (one handle per instance).
+- `SQLITE_ENABLE_FTS5` — full-text search (`CREATE VIRTUAL TABLE ... USING fts5`).
 - `SQLITE_OMIT_LOAD_EXTENSION` — no `load_extension`; removes attack surface.
 - `SQLITE_ENABLE_COLUMN_METADATA` — enables `sqlite3_column_table_name` /
   `column_database_name` / `column_origin_name` for `Stmt.columns()`.

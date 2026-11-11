@@ -329,3 +329,12 @@ test("Symbol.dispose + readonly open", () => {
   }
   unlinkSync(tmp);
 });
+
+test("FTS5 is compiled in", () => {
+  const db = Database.openInMemory();
+  db.exec("CREATE VIRTUAL TABLE docs USING fts5(title, body)");
+  db.exec("INSERT INTO docs (title, body) VALUES ('hello', 'native sqlite with full text search')");
+  const rows = db.prepareRaw("SELECT title FROM docs WHERE docs MATCH ?").all(["search"]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].title, "hello");
+});
