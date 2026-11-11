@@ -1,5 +1,11 @@
 # @cutils/sqlite
 
+## 0.8.0
+
+### Minor Changes
+
+- Build SQLite with FTS5 and ship `scripts/build-shim.mjs` to build the shim archive plus a matching ffi manifest for any target (macOS, Windows, cross-compiles via `zig cc`); the tarball archive is Linux-only.
+
 ## 0.7.0
 
 ### Minor Changes

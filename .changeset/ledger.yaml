@@ -78,3 +78,7 @@
   dir: packages/sqlite
   intents:
     - weak-cherries-invite
+"@cutils/sqlite@0.8.0":
+  dir: packages/sqlite
+  intents:
+    - quick-shims-search
