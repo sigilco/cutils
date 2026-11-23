@@ -22,7 +22,9 @@ for (let i = 0; i < argv.length; i++) {
   else throw new Error(`usage: build-prebuilt.mjs [--id <platform>-<arch>] (bad arg: ${argv[i]})`);
 }
 if (!PREBUILT_TARGETS.includes(id)) {
-  throw new Error(`build-prebuilt: unsupported target ${id} (supported: ${PREBUILT_TARGETS.join(", ")})`);
+  throw new Error(
+    `build-prebuilt: unsupported target ${id} (supported: ${PREBUILT_TARGETS.join(", ")})`,
+  );
 }
 const ext = libExt(id.split("-")[0]);
 const out = join(pkg, "prebuilt", id, `libcutils_sqlite.${ext}`);

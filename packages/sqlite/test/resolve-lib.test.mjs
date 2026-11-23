@@ -64,9 +64,7 @@ for (const [platform, arch] of [
     const other = prebuiltPath(ROOT, platform === "linux" ? "darwin" : "linux", "arm64");
     assert.throws(
       () =>
-        resolveLib(
-          base({ platform, arch, exists: (p) => p === other, hasCompiler: () => false }),
-        ),
+        resolveLib(base({ platform, arch, exists: (p) => p === other, hasCompiler: () => false })),
       /no prebuilt library for/,
     );
   });
@@ -76,7 +74,10 @@ test("env override wins over a prebuilt and must exist", () => {
   const env = { [ENV_OVERRIDE]: "/custom/lib.so" };
   const r = resolveLib(base({ env, exists: () => true }));
   assert.deepEqual(r, { path: "/custom/lib.so", source: "env" });
-  assert.throws(() => resolveLib(base({ env })), /CUTILS_SQLITE_LIB=\/custom\/lib\.so does not exist/);
+  assert.throws(
+    () => resolveLib(base({ env })),
+    /CUTILS_SQLITE_LIB=\/custom\/lib\.so does not exist/,
+  );
 });
 
 test("falls back to the in-package build/ output before compiling", () => {
