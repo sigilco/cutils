@@ -25,7 +25,7 @@ pnpm --filter @cutils-example/todo-app start
 
 Under Node the package's `shim_*` calls resolve on `globalThis` — install
 them from the shared build the way
-`packages/sqlite/test/koffi-binding.mjs` does (import it first, or copy the
+`packages/sqlite/node/binding.mjs` does (import it first, or copy the
 ~40 lines).
 
 ```sh

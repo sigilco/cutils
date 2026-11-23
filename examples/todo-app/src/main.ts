@@ -11,7 +11,7 @@
 //
 // Run under Node:  pnpm --filter @cutils-example/todo-app start
 //   (installs the shim globals from the package's shared-library build —
-//   see packages/sqlite/test/koffi-binding.mjs)
+//   see packages/sqlite/node/binding.mjs)
 // Compile to a single ELF:
 //   scriptc build src/main.ts --ffi node_modules/@cutils/sqlite/vendor/manifest.json
 

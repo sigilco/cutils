@@ -165,24 +165,26 @@ no perf claims until the bench cell lands):
 ## Node usage
 
 The npm package ships `dist/esm`. Under Node the emitted `shim_*` calls resolve
-on `globalThis` — an official [koffi](https://koffi.dev) binding loads
-`build/libcutils_sqlite.so` for you:
-
-```sh
-# one-time, inside the installed package (needs a C toolchain):
-npm run build:shared --prefix node_modules/@cutils/sqlite
-```
+on `globalThis` — an official [koffi](https://koffi.dev) binding installs them:
 
 ```ts
-import "koffi"; // ensure the optional peer is installed
 import "@cutils/sqlite/node-binding"; // installs the shim_* globals
 import { Database } from "@cutils/sqlite";
 ```
 
-`koffi` is an **optional peer dependency** — install it when you run under
-Node; scriptc builds never see it. The `.so` is linked `-Wl,-Bsymbolic` so the
-vendored amalgamation's `sqlite3_*` symbols can't interpose against a host's
-sqlite — this is load-bearing, Node ≥ 22 exports its own sqlite3 symbols.
+No build step: the tarball carries a prebuilt shared library for linux-x64,
+darwin-arm64 and darwin-x64 under `prebuilt/<platform>-<arch>/`. On any other
+platform (linux-arm64, musl) the binding compiles the vendored sources once
+with `$CC` (default `cc`) into `build/` (or a per-version tmp cache when
+`node_modules` is read-only) and reuses the result. With neither a prebuilt nor
+a C compiler it throws an error naming the platform. Set `CUTILS_SQLITE_LIB` to
+point at a shared library you built yourself
+(`sh node_modules/@cutils/sqlite/scripts/build-shared.sh /abs/out.so`).
+
+`koffi` is an **optional peer dependency** — `pnpm add koffi` when you run under
+Node; scriptc builds never see it. The ELF library is linked `-Wl,-Bsymbolic`
+so the vendored amalgamation's `sqlite3_*` symbols can't interpose against a
+host's sqlite — this is load-bearing, Node ≥ 22 exports its own sqlite3 symbols.
 
 Node ≥ 22 is the runtime floor; the test suite also runs there (no
 `using`-syntax — dispose paths are exercised via `[Symbol.dispose]()`).

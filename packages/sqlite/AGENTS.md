@@ -9,7 +9,7 @@ TS wrapper. Models on `@chttp/val` for packaging; the FFI layer follows
 - `pnpm build` — C shim object, amalgamation object, `ar` archive
   `build/libsqlite3-shim.a`, `tsc` → `dist/`
 - `pnpm build:shared` — `build/libcutils_sqlite.so` for the Node/koffi tests,
-  via `scripts/build-shared.sh` (platform-aware: `-Wl,-Bsymbolic -shared` on
+  via `scripts/build-shared.sh [abs-out-path]` (honors `$CC`; platform-aware: `-Wl,-Bsymbolic -shared` on
   ELF, `-dynamiclib` on Mach-O; **must** keep `-Wl,-Bsymbolic` on ELF: Node
   ≥ 22 exports its own `sqlite3_*` symbols; without it the shim's internal
   sqlite calls interpose onto the host's build and every handle is a zombie
@@ -17,6 +17,11 @@ TS wrapper. Models on `@chttp/val` for packaging; the FFI layer follows
   impossible there)
 - `pnpm test` — `test:c` (C assertions over the archive), `test:node`
   (wrapper through koffi), `coverage.test.mjs` (scriptc coverage of gate.ts)
+- `pnpm build:prebuilt [--id <platform>-<arch>]` — the same library into
+  `prebuilt/<platform>-<arch>/libcutils_sqlite.{so,dylib}` (gitignored). Release
+  CI builds the three `PREBUILT_TARGETS` on a runner matrix and the publish job
+  assembles them into the tarball; `node scripts/assert-prebuilt.mjs` fails if
+  one is missing.
 - `bash test/elf.test.sh` — compiles `gate.ts` to an ELF with
   `--ffi gate.ffi.json`, runs it, expects `gate OK`
 
@@ -37,7 +42,13 @@ TS wrapper. Models on `@chttp/val` for packaging; the FFI layer follows
   MUST match or `scriptc coverage` / `--ffi` builds diverge).
 - `src/internal/ffi.ts` — `declare function` block matching the manifest
   exactly (names, arity). Under Node the emitted calls hit globals;
-  `test/koffi-binding.mjs` installs them.
+  `node/binding.mjs` installs them.
+- `node/binding.mjs` — the `./node-binding` export: installs the `shim_*`
+  globals through koffi. `node/resolve-lib.mjs` picks the library:
+  `$CUTILS_SQLITE_LIB`, then `prebuilt/<platform>-<arch>/`, then `build/`,
+  then compiles from `vendor/` (needs `cc`), else a platform-naming error.
+  Plain JS shipped as-is (not tsc output, not subset code). Unit-tested in
+  `test/resolve-lib.test.mjs`; `pnpm smoke:pack` covers the installed tarball.
 - `src/` — `Database`, `StmtCore` (+ `interface Stmt<TRow>`), `Transaction`,
   `SqliteError`, `validate.ts` (Standard-Schema seam), `types.ts`.
 
@@ -69,7 +80,7 @@ Beyond the root rules:
 - `test/shim.test.c` asserts the shim at C level against the archive —
   span literals use the `SL(x)` macro (`ptr, strlen`); hardcode no lengths.
 - `test/wrapper.test.js` runs the tsc build under plain Node via
-  `test/koffi-binding.mjs`; the same fixtures must exercise the schema seam
+  `node/binding.mjs`; the same fixtures must exercise the schema seam
   through **both** `@chttp/val` and valibot (any Standard-Schema validator
   must work — never special-case one).
 - `coverage.test.mjs` shells `scriptc coverage gate.ts --ffi gate.ffi.json`
