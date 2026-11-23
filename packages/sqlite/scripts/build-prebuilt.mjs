@@ -27,8 +27,13 @@ if (!PREBUILT_TARGETS.includes(id)) {
   );
 }
 const ext = libExt(id.split("-")[0]);
-const out = join(pkg, "prebuilt", id, `libcutils_sqlite.${ext}`);
+const rel = `prebuilt/${id}/libcutils_sqlite.${ext}`; // forward slashes: sh argv on win32
+const out = join(pkg, rel);
 mkdirSync(dirname(out), { recursive: true });
-const r = spawnSync("sh", [join(pkg, "scripts", "build-shared.sh"), out], { stdio: "inherit" });
+// The script cd's to the package root first, so a relative out path lands in
+// the right place on every platform (Windows paths do not survive sh argv).
+// win32 has no `sh`; Git Bash's bash.exe is on PATH on dev machines and CI.
+const shell = process.platform === "win32" ? "bash" : "sh";
+const r = spawnSync(shell, [join(pkg, "scripts", "build-shared.sh"), rel], { stdio: "inherit" });
 if (r.status !== 0) process.exit(r.status ?? 1);
 console.log(`prebuilt ${id}: ${out} (${(statSync(out).size / 1048576).toFixed(2)} MB)`);

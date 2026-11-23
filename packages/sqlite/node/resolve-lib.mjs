@@ -24,12 +24,20 @@ import { fileURLToPath } from "node:url";
 export const ENV_OVERRIDE = "CUTILS_SQLITE_LIB";
 
 /** Targets the release workflow builds a prebuilt library for. */
-export const PREBUILT_TARGETS = ["linux-x64", "darwin-arm64", "darwin-x64"];
+export const PREBUILT_TARGETS = [
+  "linux-x64",
+  "linux-arm64",
+  "darwin-arm64",
+  "darwin-x64",
+  "win32-x64",
+  "win32-arm64",
+];
 
 /** Library file extension for a Node `process.platform`, or null if unsupported. */
 export function libExt(platform) {
   if (platform === "linux") return "so";
   if (platform === "darwin") return "dylib";
+  if (platform === "win32") return "dll";
   return null;
 }
 
@@ -45,8 +53,8 @@ export function prebuiltPath(pkgRoot, platform, arch) {
 }
 
 /** The in-package dev/consumer build output (what `build:shared` writes). */
-export function localBuildPath(pkgRoot) {
-  return join(pkgRoot, "build", "libcutils_sqlite.so");
+export function localBuildPath(pkgRoot, platform = process.platform) {
+  return join(pkgRoot, "build", `libcutils_sqlite.${libExt(platform) ?? "so"}`);
 }
 
 function defaultCanWrite(dir) {
@@ -65,15 +73,20 @@ function defaultHasCompiler(cc) {
 }
 
 function defaultCompile(pkgRoot, cc, out) {
+  // win32 has no `sh`; Git Bash's bash.exe is on PATH on dev machines and CI.
+  const shell = process.platform === "win32" ? "bash" : "sh";
+  // Forward slashes survive sh argv on win32 (C:/... is valid for git-bash).
+  const posix = (p) => p.replace(/\\/g, "/");
   const tmp = `${out}.${process.pid}.tmp`;
-  const r = spawnSync("sh", [join(pkgRoot, "scripts", "build-shared.sh"), tmp], {
+  const r = spawnSync(shell, [posix(join(pkgRoot, "scripts", "build-shared.sh")), posix(tmp)], {
     env: { ...process.env, CC: cc },
     encoding: "utf8",
   });
-  if (r.status !== 0) {
+  if (r.error || r.status !== 0) {
     rmSync(tmp, { force: true });
+    const why = r.error ? r.error.message : `exited ${r.status ?? r.signal}`;
     const tail = (r.stderr || "").trim().split("\n").slice(-5).join("\n");
-    throw new Error(`build-shared.sh exited ${r.status ?? r.signal}: ${tail}`);
+    throw new Error(`build-shared.sh ${why}: ${tail}`);
   }
   renameSync(tmp, out); // atomic: concurrent first imports never see a half file
 }
@@ -107,7 +120,7 @@ export function resolveLib(opts) {
 
   if (libExt(o.platform) === null) {
     throw new Error(
-      `@cutils/sqlite: the Node binding supports linux and darwin, not ${id}. ` +
+      `@cutils/sqlite: the Node binding supports linux, darwin and windows, not ${id}. ` +
         `Use the scriptc static build there, or set ${ENV_OVERRIDE} to a shared library built for ${id}.`,
     );
   }
@@ -116,7 +129,7 @@ export function resolveLib(opts) {
   tried.push(prebuilt);
   if (o.exists(prebuilt)) return { path: prebuilt, source: "prebuilt" };
 
-  const local = localBuildPath(o.pkgRoot);
+  const local = localBuildPath(o.pkgRoot, o.platform);
   tried.push(local);
   if (o.exists(local)) return { path: local, source: "local-build" };
 
@@ -133,7 +146,7 @@ export function resolveLib(opts) {
   const dirs = [join(o.pkgRoot, "build"), join(o.tmp, `cutils-sqlite-${o.version}-${id}`)];
   for (const dir of dirs) {
     if (!o.canWrite(dir)) continue;
-    const out = join(dir, "libcutils_sqlite.so");
+    const out = join(dir, `libcutils_sqlite.${libExt(o.platform)}`);
     if (o.exists(out)) return { path: out, source: "compiled" };
     try {
       o.compile(o.pkgRoot, cc, out);

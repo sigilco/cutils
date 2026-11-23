@@ -33,7 +33,7 @@ const base = (over) => ({
 test("platform names map to library extensions", () => {
   assert.equal(libExt("linux"), "so");
   assert.equal(libExt("darwin"), "dylib");
-  assert.equal(libExt("win32"), null);
+  assert.equal(libExt("win32"), "dll");
   assert.equal(libExt("freebsd"), null);
 });
 
@@ -46,15 +46,27 @@ test("prebuilt layout is prebuilt/<platform>-<arch>/libcutils_sqlite.<ext>", () 
     prebuiltPath(ROOT, "darwin", "arm64"),
     join(ROOT, "prebuilt/darwin-arm64/libcutils_sqlite.dylib"),
   );
-  assert.equal(prebuiltPath(ROOT, "win32", "x64"), null);
-  assert.deepEqual(PREBUILT_TARGETS, ["linux-x64", "darwin-arm64", "darwin-x64"]);
+  assert.equal(
+    prebuiltPath(ROOT, "win32", "x64"),
+    join(ROOT, "prebuilt/win32-x64/libcutils_sqlite.dll"),
+  );
+  assert.deepEqual(PREBUILT_TARGETS, [
+    "linux-x64",
+    "linux-arm64",
+    "darwin-arm64",
+    "darwin-x64",
+    "win32-x64",
+    "win32-arm64",
+  ]);
   assert.equal(targetId("darwin", "x64"), "darwin-x64");
 });
 
 for (const [platform, arch] of [
   ["linux", "x64"],
+  ["linux", "arm64"],
   ["darwin", "arm64"],
   ["darwin", "x64"],
+  ["win32", "x64"],
 ]) {
   test(`${platform}-${arch}: picks its own prebuilt, never another platform's`, () => {
     const want = prebuiltPath(ROOT, platform, arch);
@@ -81,7 +93,7 @@ test("env override wins over a prebuilt and must exist", () => {
 });
 
 test("falls back to the in-package build/ output before compiling", () => {
-  const local = localBuildPath(ROOT);
+  const local = localBuildPath(ROOT, "linux");
   const r = resolveLib(
     base({
       exists: (p) => p === local,
@@ -147,10 +159,24 @@ test("no prebuilt and no compiler: error names platform, arch and the escape hat
   );
 });
 
+test("compiled output uses the platform extension (win32 -> .dll)", () => {
+  const made = new Set();
+  const r = resolveLib(
+    base({
+      platform: "win32",
+      arch: "x64",
+      exists: (p) => made.has(p),
+      compile: (_r, _cc, out) => made.add(out),
+    }),
+  );
+  assert.equal(r.source, "compiled");
+  assert.equal(r.path, join(ROOT, "build/libcutils_sqlite.dll"));
+});
+
 test("unsupported platform: error names it", () => {
   assert.throws(
-    () => resolveLib(base({ platform: "win32", arch: "x64" })),
-    /supports linux and darwin, not win32-x64/,
+    () => resolveLib(base({ platform: "freebsd", arch: "x64" })),
+    /supports linux, darwin and windows, not freebsd-x64/,
   );
 });
 
