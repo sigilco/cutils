@@ -13,8 +13,9 @@ The same `src/` drives both modes:
 
 - **Node** — `import { Database } from "@cutils/sqlite"` resolves to
   `dist/esm`. The emitted `shim_*` calls resolve on `globalThis`; install them
-  from the shared build (`packages/sqlite/build/libcutils_sqlite.so`, via
-  `pnpm build:shared`) — see `test/koffi-binding.mjs` for the koffi wiring.
+  from the shared library (`prebuilt/<platform>-<arch>/` in the tarball, or
+  `build/libcutils_sqlite.so` via `pnpm build:shared`) — see `node/binding.mjs`
+  for the koffi wiring.
 - **ELF** — `scriptc build app.ts --ffi node_modules/@cutils/sqlite/vendor/manifest.json`
   links `vendor/.../libsqlite3-shim.a` statically. No sqlite at runtime.
 

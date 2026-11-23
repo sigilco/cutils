@@ -24,6 +24,7 @@ permissions:
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
+  ZIG_VERSION: "0.16.0"
 
 jobs:
   verify:
@@ -69,8 +70,78 @@ jobs:
           name: release-notes
           path: release-notes.md
 
+  # One shared library per platform for @cutils/sqlite's Node binding. Native
+  # runners build with cc (darwin-x64 is cross-built with -arch x86_64 on the
+  # arm64 runner); Windows runners build a PE DLL with `zig cc` targeting
+  # *-windows-gnu, which needs no MSVC install and exports every shim_* symbol.
+  # The publish job assembles them into the tarball under prebuilt/<platform>-<arch>/.
+  # ubuntu-22.04 keeps the glibc floor at 2.35 instead of whatever ubuntu-latest
+  # ships; linux-arm64 uses the matching arm runner for the same floor.
+  prebuilt:
+    name: prebuilt ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: linux-x64, os: ubuntu-22.04, ext: so, cc: cc, native: true }
+          - { id: linux-arm64, os: ubuntu-22.04-arm, ext: so, cc: cc, native: true }
+          - { id: darwin-arm64, os: macos-15, ext: dylib, cc: cc, native: true }
+          - { id: darwin-x64, os: macos-15, ext: dylib, cc: cc -arch x86_64, native: false }
+          - { id: win32-x64, os: windows-2022, ext: dll, cc: "zig cc -target x86_64-windows-gnu", native: true, zig: x86_64-windows }
+          # zig's aarch64-windows binary segfaults on windows-11-arm (0.16.0),
+          # so the arm64 DLL is cross-compiled by the x64 zig; it cannot be
+          # load-tested on x64 Windows, hence native: false.
+          - { id: win32-arm64, os: windows-2022, ext: dll, cc: "zig cc -target aarch64-windows-gnu", native: false, zig: x86_64-windows }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install zig
+        if: matrix.zig
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-${{ matrix.zig }}-${{ env.ZIG_VERSION }}.zip" -OutFile "$env:RUNNER_TEMP\zig.zip"
+          Expand-Archive "$env:RUNNER_TEMP\zig.zip" -DestinationPath "$env:RUNNER_TEMP\zig"
+          Add-Content $env:GITHUB_PATH "$env:RUNNER_TEMP\zig\zig-${{ matrix.zig }}-${{ env.ZIG_VERSION }}"
+      - name: Build
+        working-directory: packages/sqlite
+        env:
+          CC: ${{ matrix.cc }}
+        run: node scripts/build-prebuilt.mjs --id ${{ matrix.id }}
+      # `file` is a unix tool; on Windows the koffi load check below is the
+      # stronger arch assertion (a wrong-arch DLL refuses to load).
+      - name: Check architecture
+        if: matrix.ext != 'dll'
+        run: |
+          f=packages/sqlite/prebuilt/${{ matrix.id }}/libcutils_sqlite.${{ matrix.ext }}
+          file "$f"
+          case "${{ matrix.id }}" in
+            linux-x64) file "$f" | grep -q 'ELF 64-bit.*x86-64' ;;
+            linux-arm64) file "$f" | grep -q 'ELF 64-bit.*aarch64' ;;
+            darwin-arm64) file "$f" | grep -q 'Mach-O 64-bit.*arm64' ;;
+            darwin-x64) file "$f" | grep -q 'Mach-O 64-bit.*x86_64' ;;
+          esac
+      # Native runners also load the library through koffi and run FTS5.
+      - if: matrix.native
+        uses: pnpm/action-setup@v4
+      - if: matrix.native
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - if: matrix.native
+        run: pnpm install --frozen-lockfile --filter @cutils/sqlite
+      - if: matrix.native
+        working-directory: packages/sqlite
+        run: node scripts/check-shared-lib.mjs prebuilt/${{ matrix.id }}/libcutils_sqlite.${{ matrix.ext }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-${{ matrix.id }}
+          path: packages/sqlite/prebuilt/${{ matrix.id }}/libcutils_sqlite.${{ matrix.ext }}
+          if-no-files-found: error
+
   publish:
-    needs: verify
+    needs: [verify, prebuilt]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     # Tag pushes queue here until a required reviewer approves the
@@ -90,6 +161,19 @@ jobs:
       # @cutils/ffi's tarball carries the Rust-built archive and shared lib
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
+      # @cutils/sqlite's per-platform shared libraries (see the prebuilt job)
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: prebuilt-*
+          path: prebuilt-artifacts
+      - name: Place prebuilt libraries into @cutils/sqlite
+        run: |
+          for d in prebuilt-artifacts/prebuilt-*; do
+            id="${d#prebuilt-artifacts/prebuilt-}"
+            mkdir -p "packages/sqlite/prebuilt/$id"
+            cp "$d"/libcutils_sqlite.* "packages/sqlite/prebuilt/$id/"
+          done
+          node packages/sqlite/scripts/assert-prebuilt.mjs
       # packages only: examples need scriptc's toolchain and are not published
       - run: pnpm --filter "./packages/*" build
       # npm cannot roll back, so the guarantee is that a rerun converges:

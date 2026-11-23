@@ -3,12 +3,19 @@
 ## Unreleased
 
 <!-- release:start -->
+## 0.8.1
+
+### Fixes
+
+- **@cutils/sqlite:** `@cutils/sqlite/node-binding` works out of the box under Node. The tarball ships prebuilt shared libraries for linux-x64/arm64, darwin-arm64/x64 and win32-x64/arm64 under `prebuilt/<platform>-<arch>/`; other platforms compile from the vendored sources on first import (needs a C compiler), and a missing library now fails with an error naming the platform. Set `CUTILS_SQLITE_LIB` to use your own build. Consumers no longer need a build script inside `node_modules`.
+- **@cutils/sqlite:** `build:shared` is platform-aware via `scripts/build-shared.sh` (`-dynamiclib` on Mach-O, `-Wl,-Bsymbolic -shared` on ELF), takes an output path and honors `$CC`.
+<!-- release:end -->
+
 ## 0.8.0
 
 ### Features
 
 - **@cutils/sqlite:** Build SQLite with FTS5 and ship `scripts/build-shim.mjs` to build the shim archive plus a matching ffi manifest for any target (macOS, Windows, cross-compiles via `zig cc`); the tarball archive is Linux-only.
-<!-- release:end -->
 
 ## 0.7.0
 

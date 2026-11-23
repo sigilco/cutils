@@ -4,7 +4,7 @@
 // the JS string; `mutable-bytes` out params marshal as (buf,len) — the
 // declares pass only the Uint8Array. Thin exported wrappers re-expose the
 // bindings: ambient declarations cannot be exported. Under plain Node the
-// emitted calls resolve on globalThis — test/koffi-binding.mjs installs
+// emitted calls resolve on globalThis — node/binding.mjs installs
 // matching globals loaded through koffi.
 
 declare function shim_open(path: string, flags: number): bigint;

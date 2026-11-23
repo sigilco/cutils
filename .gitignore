@@ -12,3 +12,6 @@ examples/*/app
 examples/*/.vendor/
 .agents/notes/*-handoff*.md
 elf/
+
+# per-platform shared libraries assembled for the npm tarball (release CI)
+packages/sqlite/prebuilt/

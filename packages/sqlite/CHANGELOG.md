@@ -1,5 +1,13 @@
 # @cutils/sqlite
 
+## 0.8.1
+
+### Patch Changes
+
+- fix(sqlite): build:shared is platform-aware via scripts/build-shared.sh — -dynamiclib on Mach-O, keeps -Wl,-Bsymbolic -shared on ELF
+
+- fix(sqlite): @cutils/sqlite/node-binding works out of the box. The tarball ships prebuilt shared libraries for linux-x64/arm64, darwin-arm64/x64 and win32-x64/arm64, and falls back to compiling from the vendored sources (needs a C compiler); set CUTILS_SQLITE_LIB to override. No consumer-side build script needed.
+
 ## 0.8.0
 
 ### Minor Changes
