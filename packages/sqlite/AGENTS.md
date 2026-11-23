@@ -8,10 +8,13 @@ TS wrapper. Models on `@chttp/val` for packaging; the FFI layer follows
 
 - `pnpm build` — C shim object, amalgamation object, `ar` archive
   `build/libsqlite3-shim.a`, `tsc` → `dist/`
-- `pnpm build:shared` — `build/libcutils_sqlite.so` for the Node/koffi tests
-  (**must** keep `-Wl,-Bsymbolic`: Node ≥ 22 exports its own `sqlite3_*`
-  symbols; without it the shim's internal sqlite calls interpose onto the
-  host's build and every handle is a zombie → SQLITE_MISUSE)
+- `pnpm build:shared` — `build/libcutils_sqlite.so` for the Node/koffi tests,
+  via `scripts/build-shared.sh` (platform-aware: `-Wl,-Bsymbolic -shared` on
+  ELF, `-dynamiclib` on Mach-O; **must** keep `-Wl,-Bsymbolic` on ELF: Node
+  ≥ 22 exports its own `sqlite3_*` symbols; without it the shim's internal
+  sqlite calls interpose onto the host's build and every handle is a zombie
+  → SQLITE_MISUSE; Mach-O's two-level namespace makes the same bug
+  impossible there)
 - `pnpm test` — `test:c` (C assertions over the archive), `test:node`
   (wrapper through koffi), `coverage.test.mjs` (scriptc coverage of gate.ts)
 - `bash test/elf.test.sh` — compiles `gate.ts` to an ELF with

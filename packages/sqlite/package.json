@@ -1,7 +1,7 @@
 {
   "name": "@cutils/sqlite",
   "version": "0.8.0",
-  "description": "Embedded SQLite for chttp/scriptc apps — vendored amalgamation, FFI shim, Standard-Schema row seam. Compiles to a single static ELF.",
+  "description": "Embedded SQLite for chttp/scriptc apps \u2014 vendored amalgamation, FFI shim, Standard-Schema row seam. Compiles to a single static ELF.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -15,7 +15,8 @@
     "elf",
     "scripts/build-shim.mjs",
     "ffi.json",
-    "build/libsqlite3-shim.a"
+    "build/libsqlite3-shim.a",
+    "scripts/build-shared.sh"
   ],
   "type": "module",
   "main": "./dist/esm/index.js",
@@ -34,7 +35,7 @@
     "build:sqlite": "cc -O2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_FTS5 -c vendor/sqlite-amalgamation/sqlite3.c -o build/sqlite3.o",
     "build:archive": "ar rcs build/libsqlite3-shim.a build/sqlite_shim.o build/sqlite3.o",
     "build:lib": "ranlib build/libsqlite3-shim.a",
-    "build:shared": "cc -O2 -fPIC -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_FTS5 -Wl,-Bsymbolic -shared vendor/shim/sqlite_shim.c vendor/sqlite-amalgamation/sqlite3.c -o build/libcutils_sqlite.so",
+    "build:shared": "sh scripts/build-shared.sh",
     "build:ts": "tsc -p tsconfig.json",
     "build:elf": "node scripts/emit-elf-shims.mjs",
     "build": "mkdir -p build && npm run build:c && npm run build:sqlite && npm run build:archive && npm run build:lib && npm run build:ts && sed 's|\"\\.\\.\", \"build\"|\"..\", \"..\", \"build\"|' test/koffi-binding.mjs > dist/esm/node-binding.mjs && npm run build:elf",
