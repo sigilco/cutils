@@ -24,6 +24,7 @@ permissions:
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
+  ZIG_VERSION: "0.16.0"
 
 jobs:
   verify:
@@ -69,11 +70,13 @@ jobs:
           name: release-notes
           path: release-notes.md
 
-  # One shared library per platform for @cutils/sqlite's Node binding, built
-  # natively on a matching runner (darwin-x64 is cross-built with
-  # -arch x86_64 on the arm64 runner). The publish job assembles them into the
-  # tarball under prebuilt/<platform>-<arch>/. ubuntu-22.04 keeps the glibc
-  # floor at 2.35 instead of whatever ubuntu-latest ships.
+  # One shared library per platform for @cutils/sqlite's Node binding. Native
+  # runners build with cc (darwin-x64 is cross-built with -arch x86_64 on the
+  # arm64 runner); Windows runners build a PE DLL with `zig cc` targeting
+  # *-windows-gnu, which needs no MSVC install and exports every shim_* symbol.
+  # The publish job assembles them into the tarball under prebuilt/<platform>-<arch>/.
+  # ubuntu-22.04 keeps the glibc floor at 2.35 instead of whatever ubuntu-latest
+  # ships; linux-arm64 uses the matching arm runner for the same floor.
   prebuilt:
     name: prebuilt ${{ matrix.id }}
     runs-on: ${{ matrix.os }}
@@ -82,21 +85,36 @@ jobs:
       matrix:
         include:
           - { id: linux-x64, os: ubuntu-22.04, ext: so, cc: cc, native: true }
+          - { id: linux-arm64, os: ubuntu-22.04-arm, ext: so, cc: cc, native: true }
           - { id: darwin-arm64, os: macos-14, ext: dylib, cc: cc, native: true }
           - { id: darwin-x64, os: macos-14, ext: dylib, cc: cc -arch x86_64, native: false }
+          - { id: win32-x64, os: windows-2022, ext: dll, cc: "zig cc -target x86_64-windows-gnu", native: true, zig: x86_64-windows }
+          - { id: win32-arm64, os: windows-11-arm, ext: dll, cc: "zig cc -target aarch64-windows-gnu", native: true, zig: aarch64-windows }
     steps:
       - uses: actions/checkout@v4
+      - name: Install zig
+        if: matrix.zig
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://ziglang.org/download/${{ env.ZIG_VERSION }}/zig-${{ matrix.zig }}-${{ env.ZIG_VERSION }}.zip" -OutFile "$env:RUNNER_TEMP\zig.zip"
+          Expand-Archive "$env:RUNNER_TEMP\zig.zip" -DestinationPath "$env:RUNNER_TEMP\zig"
+          Add-Content $env:GITHUB_PATH "$env:RUNNER_TEMP\zig\zig-${{ matrix.zig }}-${{ env.ZIG_VERSION }}"
       - name: Build
         working-directory: packages/sqlite
         env:
           CC: ${{ matrix.cc }}
         run: node scripts/build-prebuilt.mjs --id ${{ matrix.id }}
+      # `file` is a unix tool; on Windows the koffi load check below is the
+      # stronger arch assertion (a wrong-arch DLL refuses to load).
       - name: Check architecture
+        if: matrix.ext != 'dll'
         run: |
           f=packages/sqlite/prebuilt/${{ matrix.id }}/libcutils_sqlite.${{ matrix.ext }}
           file "$f"
           case "${{ matrix.id }}" in
             linux-x64) file "$f" | grep -q 'ELF 64-bit.*x86-64' ;;
+            linux-arm64) file "$f" | grep -q 'ELF 64-bit.*aarch64' ;;
             darwin-arm64) file "$f" | grep -q 'Mach-O 64-bit.*arm64' ;;
             darwin-x64) file "$f" | grep -q 'Mach-O 64-bit.*x86_64' ;;
           esac
