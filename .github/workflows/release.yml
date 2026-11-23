@@ -86,10 +86,13 @@ jobs:
         include:
           - { id: linux-x64, os: ubuntu-22.04, ext: so, cc: cc, native: true }
           - { id: linux-arm64, os: ubuntu-22.04-arm, ext: so, cc: cc, native: true }
-          - { id: darwin-arm64, os: macos-14, ext: dylib, cc: cc, native: true }
-          - { id: darwin-x64, os: macos-14, ext: dylib, cc: cc -arch x86_64, native: false }
+          - { id: darwin-arm64, os: macos-15, ext: dylib, cc: cc, native: true }
+          - { id: darwin-x64, os: macos-15, ext: dylib, cc: cc -arch x86_64, native: false }
           - { id: win32-x64, os: windows-2022, ext: dll, cc: "zig cc -target x86_64-windows-gnu", native: true, zig: x86_64-windows }
-          - { id: win32-arm64, os: windows-11-arm, ext: dll, cc: "zig cc -target aarch64-windows-gnu", native: true, zig: aarch64-windows }
+          # zig's aarch64-windows binary segfaults on windows-11-arm (0.16.0),
+          # so the arm64 DLL is cross-compiled by the x64 zig; it cannot be
+          # load-tested on x64 Windows, hence native: false.
+          - { id: win32-arm64, os: windows-2022, ext: dll, cc: "zig cc -target aarch64-windows-gnu", native: false, zig: x86_64-windows }
     steps:
       - uses: actions/checkout@v4
       - name: Install zig
