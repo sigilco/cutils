@@ -7,7 +7,7 @@
 
 ### Fixes
 
-- **@cutils/sqlite:** `@cutils/sqlite/node-binding` works out of the box under Node. The tarball ships prebuilt shared libraries for linux-x64, darwin-arm64 and darwin-x64 under `prebuilt/<platform>-<arch>/`; other platforms compile from the vendored sources on first import (needs a C compiler), and a missing library now fails with an error naming the platform. Set `CUTILS_SQLITE_LIB` to use your own build. Consumers no longer need a build script inside `node_modules`.
+- **@cutils/sqlite:** `@cutils/sqlite/node-binding` works out of the box under Node. The tarball ships prebuilt shared libraries for linux-x64/arm64, darwin-arm64/x64 and win32-x64/arm64 under `prebuilt/<platform>-<arch>/`; other platforms compile from the vendored sources on first import (needs a C compiler), and a missing library now fails with an error naming the platform. Set `CUTILS_SQLITE_LIB` to use your own build. Consumers no longer need a build script inside `node_modules`.
 - **@cutils/sqlite:** `build:shared` is platform-aware via `scripts/build-shared.sh` (`-dynamiclib` on Mach-O, `-Wl,-Bsymbolic -shared` on ELF), takes an output path and honors `$CC`.
 <!-- release:end -->
 

@@ -18,10 +18,11 @@ TS wrapper. Models on `@chttp/val` for packaging; the FFI layer follows
 - `pnpm test` — `test:c` (C assertions over the archive), `test:node`
   (wrapper through koffi), `coverage.test.mjs` (scriptc coverage of gate.ts)
 - `pnpm build:prebuilt [--id <platform>-<arch>]` — the same library into
-  `prebuilt/<platform>-<arch>/libcutils_sqlite.{so,dylib}` (gitignored). Release
-  CI builds the three `PREBUILT_TARGETS` on a runner matrix and the publish job
-  assembles them into the tarball; `node scripts/assert-prebuilt.mjs` fails if
-  one is missing.
+  `prebuilt/<platform>-<arch>/libcutils_sqlite.{so,dylib,dll}` (gitignored).
+  Release CI builds every `PREBUILT_TARGETS` entry (linux-x64/arm64,
+  darwin-arm64/x64, win32-x64/arm64 — Windows via `zig cc -target
+  *-windows-gnu`) on a runner matrix and the publish job assembles them into
+  the tarball; `node scripts/assert-prebuilt.mjs` fails if one is missing.
 - `bash test/elf.test.sh` — compiles `gate.ts` to an ELF with
   `--ffi gate.ffi.json`, runs it, expects `gate OK`
 
