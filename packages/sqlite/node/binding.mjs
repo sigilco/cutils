@@ -1,16 +1,38 @@
+// Node entry for @cutils/sqlite (exported as "./node-binding").
 // Installs the `shim_*` globals the emitted dist/esm/internal/ffi.js calls,
-// backed by the shared build (build/libcutils_sqlite.so) through koffi.
+// backed by the shared library through koffi. Library lookup (prebuilt first,
+// compile-from-vendor fallback) lives in ./resolve-lib.mjs.
 // The scriptc span ABI means string/bytes params cross as (ptr,len) pairs —
 // koffi can't produce that layout from a JS string, so each binding is
 // wrapped in a JS adapter that encodes the span explicitly. Handles cross
 // as uint64 bigints (pointer-sized on x86_64/aarch64).
 
-import koffi from "koffi";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { createRequire } from "node:module";
+import { packageRoot, packageVersion, resolveLib } from "./resolve-lib.mjs";
 
-const dir = path.dirname(fileURLToPath(import.meta.url));
-const lib = koffi.load(path.join(dir, "..", "build", "libcutils_sqlite.so"));
+function loadKoffi() {
+  try {
+    return createRequire(import.meta.url)("koffi");
+  } catch (e) {
+    if (e && e.code === "MODULE_NOT_FOUND") {
+      throw new Error(
+        "@cutils/sqlite/node-binding needs the optional peer dependency `koffi` (pnpm add koffi)",
+        { cause: e },
+      );
+    }
+    throw e;
+  }
+}
+
+const root = packageRoot();
+const resolved = resolveLib({ pkgRoot: root, version: packageVersion(root) });
+/** Absolute path of the shared library that was loaded. */
+export const libraryPath = resolved.path;
+/** "env" | "prebuilt" | "local-build" | "compiled" */
+export const librarySource = resolved.source;
+
+const koffi = loadKoffi();
+const lib = koffi.load(libraryPath);
 
 const g = globalThis;
 const enc = new TextEncoder();

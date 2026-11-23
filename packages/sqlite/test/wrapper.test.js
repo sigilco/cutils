@@ -1,8 +1,8 @@
 // Node-side suite for the emitted wrapper (dist/esm) over the shared shim
-// lib via test/koffi-binding.mjs. Same fixtures run through BOTH @chttp/val
+// lib via node/binding.mjs. Same fixtures run through BOTH @chttp/val
 // and valibot schemas to prove the Standard-Schema seam.
 
-import "./koffi-binding.mjs";
+import "../node/binding.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { unlinkSync } from "node:fs";
