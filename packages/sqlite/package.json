@@ -1,7 +1,7 @@
 {
   "name": "@cutils/sqlite",
-  "version": "0.8.0",
-  "description": "Embedded SQLite for chttp/scriptc apps \u2014 vendored amalgamation, FFI shim, Standard-Schema row seam. Compiles to a single static ELF.",
+  "version": "0.8.1",
+  "description": "Embedded SQLite for chttp/scriptc apps — vendored amalgamation, FFI shim, Standard-Schema row seam. Compiles to a single static ELF.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

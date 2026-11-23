@@ -82,3 +82,8 @@
   dir: packages/sqlite
   intents:
     - quick-shims-search
+"@cutils/sqlite@0.8.1":
+  dir: packages/sqlite
+  intents:
+    - famous-trains-tap
+    - weak-mice-matter
